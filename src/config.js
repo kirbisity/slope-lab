@@ -24,9 +24,19 @@ export const PHYSICS = {
   softLandingSpeed: 4,
   crashLandingSpeed: 11,
   startSpeed: 1,
-  // A pop off the tails: 3 m/s up is ~0.45 m of lift, enough to time a
-  // takeoff at a lip without turning every bump into a launch pad.
-  jumpImpulse: 3,
+  // A pop off the tails: 4 m/s up is ~0.8 m of lift (v²/2g), enough to
+  // clear a roller or add height at a lip.
+  jumpImpulse: 4,
+  // Holding Flip tucks the body and spins it backwards: 7.5 rad/s is one
+  // backflip in ~0.85 s. Letting go opens the body, which multiplies its
+  // moment of inertia about five times, so the same angular momentum spins
+  // five times slower: the rider controls rotation the way divers do.
+  spinRateTucked: 7.5,
+  openSpinFactor: 0.2,
+  // How far the body may be off the slope at touchdown after a stunt.
+  // Past the first is a sketchy landing (Ouch); past the second, a crash.
+  trickSketchyAngle: 0.3,
+  trickCrashAngle: 0.6,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:
@@ -44,7 +54,24 @@ export const PHYSICS = {
   maxRunSeconds: 180,
 };
 
+// Gear thrown off in a crash: each piece is its own little body.
+export const DEBRIS = {
+  // Snow is soft: a ski keeps a fifth of its normal speed on a bounce, and
+  // slides with more friction than a ski on its base.
+  restitution: 0.25,
+  slideFriction: 0.25,
+  spinKeptOnBounce: 0.6,
+  airDrag: 0.02,
+  // Thrown clear of the body: up and outward on top of the skier's speed.
+  launchUp: [3, 7],
+  launchSideways: 3,
+  spin: [4, 14],
+  restSpeed: 0.25,
+};
+
 export const SCORING = {
+  // Joy for each full flip landed cleanly.
+  flipJoy: 60,
   // Joy per second is speed above a walking pace, boosted in the air.
   joySpeedFloor: 2,
   airJoyMultiplier: 1.5,

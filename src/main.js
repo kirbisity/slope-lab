@@ -1,5 +1,5 @@
 // Slope Lab: wires the course, the physics run, the renderer and the page.
-import { PHYSICS, VIEW, COLORS } from './config.js';
+import { PHYSICS, VIEW, COLORS, SCORING } from './config.js';
 import { SANDBOX, CHALLENGES, ALL_COURSES, findCourse, DIFFICULTY_LABELS, SAMPLE_EQUATIONS } from './courses.js';
 import { createEquationPiece, createSketchPiece, buildSurfaces, pieceLength, distanceToPiece, courseBounds, sampleFunction } from './track.js';
 import { compileEquation } from './expression.js';
@@ -11,6 +11,8 @@ import { attachGestures, capture } from './input.js';
 import { serialiseCourse, parseCourseFile, loadPreference, savePreference, recordStars } from './storage.js';
 import { createRecorder, recordSample, ghostPose, beatsGhost, ghostFromRun, isGhost } from './ghost.js';
 import { createAudio, unlock, setMuted, updateAmbience, playLanding, playCrash, playChime } from './audio.js';
+import { generateJoyride, randomSeed, JOYRIDE_ID, JOYRIDE_VERSION } from './joyride.js';
+import { throwGear, stepAllGear } from './debris.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -35,8 +37,10 @@ const state = {
   paused: false,
   run: null,
   lastTrace: null,
-  keys: { tuck: false, brake: false },
-  touch: { tuck: false, brake: false },
+  keys: { tuck: false, brake: false, trick: false },
+  touch: { tuck: false, brake: false, trick: false },
+  gear: [],
+  slowMotionSeconds: 0,
   jumpBufferSeconds: 0,
   look: { tuck: 0, pitch: 0, tumble: 0, brake: false },
   particles: [],
@@ -60,6 +64,11 @@ const state = {
 };
 state.audio.muted = Boolean(loadPreference('muted', false));
 
+// A crash plays out in slow motion for a moment: this much real time, at
+// this share of normal speed.
+const CRASH_SLOW_MOTION_SECONDS = 0.9;
+const CRASH_SLOW_MOTION_RATE = 0.3;
+
 // Camera shake per m/s of landing impact above the soft limit, in metres.
 const SHAKE_PER_IMPACT = 0.05;
 const SHAKE_DECAY_PER_SECOND = 7;
@@ -78,14 +87,38 @@ function lockedPiecesFor(course) {
   return course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: course.id !== 'sandbox' }));
 }
 
+/** The current Joyride slope: kept across reloads until a new one is asked for. */
+function joyrideCourse(newSlope) {
+  let seed = newSlope ? null : loadPreference('joyride.seed', null);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (!Number.isFinite(seed)) seed = randomSeed();
+    const course = generateJoyride(seed);
+    if (course) {
+      savePreference('joyride.seed', seed);
+      return course;
+    }
+    seed = null;
+  }
+  return findCourse('sandbox');
+}
+
+function isJoyride() {
+  return state.course.id === JOYRIDE_ID;
+}
+
+function newJoyride() {
+  loadCourse(JOYRIDE_ID, { newSlope: true });
+  toast('A new slope', 'good');
+}
+
 function loadCourse(id, options = {}) {
-  const course = findCourse(id);
+  const course = id === JOYRIDE_ID ? joyrideCourse(options.newSlope) : findCourse(id);
   state.course = course;
   state.selectedPieceId = null;
   state.lastTrace = null;
   let pieces = lockedPiecesFor(course);
   let start = { ...course.start };
-  const draft = options.file || loadDraft(course.id);
+  const draft = options.file || (course.id === JOYRIDE_ID ? null : loadDraft(course.id));
   if (draft) {
     if (course.id === 'sandbox') pieces = [];
     pieces = pieces.concat(draft.pieces);
@@ -113,6 +146,7 @@ function loadDraft(courseId) {
 
 function saveDraft() {
   const course = state.course;
+  if (course.id === JOYRIDE_ID) return;
   // The sandbox stores every piece; challenges only what the player added.
   const pieces = course.id === 'sandbox' ? state.pieces.map((piece) => ({ ...piece, locked: false })) : state.pieces;
   savePreference(`draft.${course.id}`, serialiseCourse(course.id, state.start, pieces));
@@ -127,6 +161,10 @@ function piecesChanged(options = {}) {
 
 function addPiece(piece) {
   if (!piece) return false;
+  if (state.course.ink === 0) {
+    toast('Joyride slopes are generated. Build your own in the challenges.', 'warn');
+    return false;
+  }
   if (state.course.ink != null && inkUsed() + pieceLength(piece) > state.course.ink + 0.01) {
     toast(`Not enough ink: ${Math.round(pieceLength(piece))} m needed, ${Math.max(0, Math.round(state.course.ink - inkUsed()))} m left`, 'warn');
     return false;
@@ -163,8 +201,12 @@ function removePiece(id) {
 
 // ------------------------------------------------------------------ riding
 
-function loadGhost(courseId) {
-  const stored = loadPreference(`ghost.${courseId}`, null);
+function ghostKey(course) {
+  return course.id === JOYRIDE_ID ? `ghost.joyride.v${JOYRIDE_VERSION}.${course.seed}` : `ghost.${course.id}`;
+}
+
+function loadGhost(course) {
+  const stored = loadPreference(ghostKey(course), null);
   return isGhost(stored) ? stored : null;
 }
 
@@ -172,13 +214,15 @@ function startRide() {
   closeOverlays();
   unlock(state.audio);
   state.recorder = createRecorder();
-  state.ghost = loadGhost(state.course.id);
+  state.ghost = loadGhost(state.course);
   state.shake = 0;
+  state.gear = [];
+  state.slowMotionSeconds = 0;
   state.run = createRun(state.course, state.pieces, state.surfaces);
   state.mode = 'ride';
   state.paused = false;
   state.particles = [];
-  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, brake: false };
+  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, brake: false, spin: 0, lostGear: false };
   state.accumulator = 0;
   state.gForce = 1;
   state.resultTimer = 0;
@@ -197,6 +241,8 @@ function backToEdit() {
   state.mode = 'edit';
   state.paused = false;
   state.particles = [];
+  state.gear = [];
+  state.slowMotionSeconds = 0;
   document.body.classList.remove('riding');
   document.body.classList.add('editing');
   $('ride-controls').hidden = true;
@@ -225,7 +271,12 @@ function updateRideButton() {
 
 function currentControls() {
   const jump = state.jumpBufferSeconds > 0;
-  return { tuck: state.keys.tuck || state.touch.tuck, brake: state.keys.brake || state.touch.brake, jump };
+  return {
+    tuck: state.keys.tuck || state.touch.tuck,
+    brake: state.keys.brake || state.touch.brake,
+    trick: state.keys.trick || state.touch.trick,
+    jump,
+  };
 }
 
 function physicsFrame(frameSeconds) {
@@ -243,6 +294,12 @@ function physicsFrame(frameSeconds) {
   }
 }
 
+const FLIP_NAMES = ['Backflip', 'Double backflip', 'Triple backflip', 'Quad backflip'];
+const CRASH_MESSAGES = {
+  'over-rotated': 'Over-rotated! Let go of Flip sooner',
+  'under-rotated': 'Under-rotated! Hold Flip longer, or pop higher',
+};
+
 function handleRunEvent(event) {
   const run = state.run;
   switch (event.type) {
@@ -255,16 +312,22 @@ function handleRunEvent(event) {
       }
       break;
     case 'hard':
-      toast(`${event.kind === 'kink' ? 'Sharp kink' : 'Hard landing'} · ${event.impact.toFixed(1)} m/s into the snow`, 'warn');
+      toast(event.kind === 'sketchy' ? 'Sketchy landing: not quite round' : `${event.kind === 'kink' ? 'Sharp kink' : 'Hard landing'} · ${event.impact.toFixed(1)} m/s into the snow`, 'warn');
       spray(event.x, event.y, 30, 4);
       if (event.kind === 'kink') playLanding(state.audio, event.impact);
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * (event.impact - PHYSICS.softLandingSpeed));
       break;
     case 'crash':
-      toast(`Wipeout · ${event.impact.toFixed(1)} m/s into the snow`, 'bad');
+      toast(CRASH_MESSAGES[event.kind] || `Wipeout · ${event.impact.toFixed(1)} m/s into the snow`, 'bad');
       spray(event.x, event.y, 60, 6);
+      state.gear = throwGear(run.skier);
+      state.slowMotionSeconds = CRASH_SLOW_MOTION_SECONDS;
       playCrash(state.audio);
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * event.impact);
+      break;
+    case 'trick':
+      toast(`${FLIP_NAMES[Math.min(event.flips, FLIP_NAMES.length) - 1]}! +${event.flips * SCORING.flipJoy} joy`, 'good');
+      playChime(state.audio, [990, 1320, 1760].slice(0, 1 + Math.min(2, event.flips)));
       break;
     case 'token':
       toast(`Snowflake ${run.collected.size} of ${run.course.tokens.length}`, 'good');
@@ -403,7 +466,16 @@ function frame(now) {
 function tick(dt) {
   state.time += dt;
   if (state.run) {
-    if (!state.paused) physicsFrame(dt);
+    // A crash plays in slow motion; everything that moves shares the clock.
+    let worldDt = dt;
+    if (state.slowMotionSeconds > 0) {
+      state.slowMotionSeconds -= dt;
+      worldDt = dt * CRASH_SLOW_MOTION_RATE;
+    }
+    if (!state.paused) {
+      physicsFrame(worldDt);
+      if (state.gear.length) state.gear = stepAllGear(state.gear, state.run.surfaces, worldDt, state.run.lowestY);
+    }
     updateLook(dt);
     followSkier(dt);
     if (state.resultTimer > 0) {
@@ -431,7 +503,9 @@ function updateLook(dt) {
   const run = state.run;
   const controls = currentControls();
   const look = state.look;
-  look.tuck += ((controls.tuck ? 1 : 0) - look.tuck) * Math.min(1, dt * 10);
+  look.tuck += ((controls.tuck || (controls.trick && run.skier.mode === 'air') ? 1 : 0) - look.tuck) * Math.min(1, dt * 10);
+  look.spin = run.skier.spin;
+  look.lostGear = run.skier.crashed;
   look.brake = controls.brake && run.skier.mode === 'ground';
   const difference = Math.atan2(Math.sin(run.skier.pitch - look.pitch), Math.cos(run.skier.pitch - look.pitch));
   look.pitch += difference * Math.min(1, dt * 18);
@@ -465,6 +539,7 @@ function draw() {
     look: state.look,
     prediction,
     ghost,
+    gear: state.gear,
     particles: state.particles,
     eraser: state.eraser,
     time: state.time,
@@ -506,7 +581,8 @@ function updateReadout(dt) {
   const g = skier.mode === 'ground' ? skier.normalAccel / PHYSICS.gravity : 0;
   state.gForce += (g - state.gForce) * Math.min(1, dt * 8);
   setText('gauge-g', `${state.gForce.toFixed(1)} g`);
-  setText('gauge-air', `${(skier.mode === 'air' ? skier.airSeconds : 0).toFixed(1)} s`);
+  const turned = skier.mode === 'air' && Math.abs(skier.spin) > 0.05 ? ` · ${Math.round((skier.spin * 180) / Math.PI)}°` : '';
+  setText('gauge-air', `${(skier.mode === 'air' ? skier.airSeconds : 0).toFixed(1)} s${turned}`);
 }
 
 // ----------------------------------------------------------------- toasts
@@ -811,7 +887,6 @@ function starString(flags, total) {
 
 function renderCourseChrome() {
   const course = state.course;
-  $('course-name').textContent = course.name;
   $('course-sign').dataset.difficulty = course.difficulty;
   $('course-sign').title = DIFFICULTY_LABELS[course.difficulty];
   const progress = loadPreference('stars', {})[course.id] || [];
@@ -824,6 +899,13 @@ function renderCourseChrome() {
   $('hint-text').hidden = !course.hint;
   $('flag-tool').disabled = !course.editableStart;
   if (!course.editableStart && state.tool === 'flag') setTool('pan');
+  // Joyride slopes are generated: ride and read them, but nothing to build.
+  const buildable = course.ink !== 0;
+  for (const tool of document.querySelectorAll('.tool[data-tool="draw"], .tool[data-tool="erase"], .tool[data-tool="flag"]')) tool.hidden = !buildable;
+  $('new-slope-button').hidden = buildable;
+  $('equation-form').hidden = !buildable;
+  if (!buildable && state.tool !== 'pan') setTool('pan');
+  $('course-name').textContent = course.id === JOYRIDE_ID ? `Joyride #${course.seed % 10000}` : course.name;
 }
 
 function renderCourseGrid() {
@@ -835,6 +917,7 @@ function renderCourseGrid() {
     card.type = 'button';
     card.className = 'course-card';
     card.setAttribute('aria-current', String(course.id === state.course.id));
+    if (course.id === JOYRIDE_ID && state.course.id === JOYRIDE_ID) card.title = 'Pick again for a new slope';
     const title = document.createElement('span');
     title.className = 'card-title';
     const sign = document.createElement('span');
@@ -855,8 +938,8 @@ function renderCourseGrid() {
     card.append(title, meta, brief);
     card.addEventListener('click', () => {
       closeOverlays();
-      loadCourse(course.id);
-      if (course.id !== 'sandbox') setPanelOpen(true);
+      loadCourse(course.id, { newSlope: course.id === JOYRIDE_ID && state.course.id === JOYRIDE_ID });
+      if (course.id !== 'sandbox' && course.id !== JOYRIDE_ID) setPanelOpen(true);
     });
     grid.append(card);
   }
@@ -907,7 +990,7 @@ function showResult() {
   if (beatsGhost(run, state.ghost)) {
     const previous = state.ghost;
     state.ghost = ghostFromRun(run, state.recorder);
-    savePreference(`ghost.${course.id}`, state.ghost);
+    savePreference(ghostKey(course), state.ghost);
     note = previous ? `New best: ${run.time.toFixed(2)} s, ${(previous.time - run.time).toFixed(2)} s faster. Your ghost will race you.` : `Your ghost will race you next time.`;
   } else if (state.ghost && run.status === 'finished') {
     note = `Best ${state.ghost.time.toFixed(2)} s · this run ${(run.time - state.ghost.time).toFixed(2)} s slower.`;
@@ -943,10 +1026,15 @@ function showResult() {
     return item;
   }));
   const index = CHALLENGES.findIndex((challenge) => challenge.id === course.id);
-  const next = course.id === 'sandbox' ? CHALLENGES[0] : CHALLENGES[index + 1];
+  const joyride = course.id === JOYRIDE_ID;
+  const next = course.id === 'sandbox' || joyride ? CHALLENGES[0] : CHALLENGES[index + 1];
   $('result-next').hidden = !(next && (run.status === 'finished' || course.id === 'sandbox'));
-  $('result-next').textContent = course.id === 'sandbox' ? 'Try a challenge' : 'Next slope';
+  $('result-next').textContent = joyride ? 'Build with maths' : course.id === 'sandbox' ? 'Try a challenge' : 'Next slope';
   $('result-next').onclick = () => { loadCourse(next.id); setPanelOpen(true); };
+  $('result-new').hidden = !joyride;
+  if (joyride && run.status === 'finished') {
+    $('result-line').textContent = `${note} Next: design your own slopes with equations, starting at First Tracks. Joyride stays first in the slope list.`;
+  }
   renderCourseChrome();
   $('result-overlay').hidden = false;
 }
@@ -1017,6 +1105,8 @@ window.addEventListener('keydown', (event) => {
     if (key === 'arrowdown' || key === 's') { state.keys.tuck = true; event.preventDefault(); }
     if (key === 'arrowleft' || key === 'a') { state.keys.brake = true; event.preventDefault(); }
     if ((key === ' ' || key === 'arrowup' || key === 'w') && !event.repeat) { state.jumpBufferSeconds = 0.15; event.preventDefault(); }
+    if (key === 'arrowright' || key === 'd') { state.keys.trick = true; event.preventDefault(); }
+    if (key === 'n' && isJoyride()) newJoyride();
     if (key === 'p') togglePause();
     if (key === 'r') backToEdit();
     if (key === 'enter') rideButtonPressed();
@@ -1028,6 +1118,7 @@ window.addEventListener('keydown', (event) => {
   if (key === 'e') setTool('erase');
   if (key === 's') setTool('flag');
   if (key === 'f') fitView();
+  if (key === 'n' && isJoyride()) newJoyride();
   if (key === 't') setPanelOpen($('tracks-panel').hidden);
   if (key === '?') openOverlay('help-overlay');
   if ((key === 'delete' || key === 'backspace') && selectedPiece() && !selectedPiece().locked) removePiece(state.selectedPieceId);
@@ -1037,6 +1128,7 @@ window.addEventListener('keyup', (event) => {
   const key = event.key.toLowerCase();
   if (key === 'arrowdown' || key === 's') state.keys.tuck = false;
   if (key === 'arrowleft' || key === 'a') state.keys.brake = false;
+  if (key === 'arrowright' || key === 'd') state.keys.trick = false;
 });
 
 window.addEventListener('blur', () => {
@@ -1044,6 +1136,8 @@ window.addEventListener('blur', () => {
   state.keys.brake = false;
   state.touch.tuck = false;
   state.touch.brake = false;
+  state.keys.trick = false;
+  state.touch.trick = false;
 });
 
 // --------------------------------------------------------------- buttons
@@ -1093,6 +1187,8 @@ for (const overlay of document.querySelectorAll('.overlay')) {
   overlay.addEventListener('click', (event) => { if (event.target === overlay && overlay.id !== 'result-overlay') closeOverlays(); });
 }
 $('result-edit').addEventListener('click', backToEdit);
+$('result-new').addEventListener('click', () => { newJoyride(); startRide(); });
+$('new-slope-button').addEventListener('click', newJoyride);
 $('result-again').addEventListener('click', startRide);
 
 $('equation-form').addEventListener('submit', submitForm);
@@ -1152,10 +1248,10 @@ document.body.classList.add('editing');
 setTool('pan');
 showHelpPage(0);
 resizeCanvas();
-loadCourse(loadPreference('course', 'sandbox'));
+loadCourse(loadPreference('course', JOYRIDE_ID));
 if (!loadPreference('welcomed', false)) {
   savePreference('welcomed', true);
-  setTimeout(() => toast('Press Ride to try the demo jump'), 400);
+  setTimeout(() => toast('Press Ride. Hold Flip in the air, let go to land.'), 400);
 }
 requestAnimationFrame(frame);
 window.slopeLab = { state, startRide, backToEdit, loadCourse, fitView, advance };

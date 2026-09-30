@@ -3,7 +3,8 @@
 Design ski runs with maths, then watch real physics ride them.
 
 Every track is the graph of `y = f(x)` over an x range, or a line you sketch.
-Press **Ride** and a skier takes it on: gravity along the slope, snow
+Press **Ride** and a skier takes it on, and you can pop, tuck, brake and
+flip: gravity along the slope, snow
 friction, air drag, leaving the snow over crests when `v²κ > g·cosθ`, flying
 a parabola, and landing softly only when the hill matches the flight.
 
@@ -25,13 +26,20 @@ Works with mouse, keyboard, touch and pen, on phones and desktops.
 | Tuck (less drag) | ↓ or S | hold Tuck |
 | Brake (snowplough) | ← or A | hold Brake |
 | Pop off the snow | Space, ↑ or W | Pop |
+| Flip (hold in the air; let go to open up) | → or D | hold Flip |
+| New Joyride slope | N | New slope |
 | Back to editing | R or Esc | ↺ |
 | Move, sketch, erase, start flag | V, D, E, S | tool bar |
 | Equations panel, fit view | T, F | tool bar |
 
 ## Courses
 
-- **Sandbox** — build anything; loads with a demo jump.
+- **Joyride** — the first level: a new random slope every time, no maths
+  needed. Every slope is built from equations (1 − cos rollers, half-cosine
+  drops, landing hills fitted to a measured takeoff) and ridden hands-off
+  before it is offered, so it is always finishable. Finish one and the game
+  points you to the equation challenges; Joyride stays first in the list.
+- **Sandbox** — build anything; loads with a 319 m demo run with two jumps.
 - **First Tracks** (green) — a line gets you down; a curve lands softly.
 - **The Kicker** (blue) — build a landing hill that matches the flight parabola.
 - **Energy Bank** (blue) — ½v² + gh, friction and drag decide if you climb out.
@@ -54,6 +62,9 @@ course is proven solvable.
 | `src/camera.js`, `src/renderer.js` | The 2.5D projection and drawing |
 | `src/input.js`, `src/main.js` | Gestures, keyboard, panels, the game loop |
 | `src/storage.js` | Course files (including old Skateboarding saves), progress |
+| `src/joyride.js` | The random slope generator and its hands-off validation |
+| `src/debris.js` | Skis, poles and helmet thrown off in a crash, each with its own physics |
+| `src/ghost.js`, `src/audio.js` | Best-run ghost recording; procedural sound |
 
 ```sh
 npm test             # physics, parser, courses, storage, camera

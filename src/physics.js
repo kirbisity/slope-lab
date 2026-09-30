@@ -26,6 +26,8 @@ export function createSkier(start) {
     facing: 1,
     pitch: 0,
     crashed: false,
+    spin: 0,
+    spinRate: 0,
     airSeconds: 0,
     groundedSeconds: 0,
   };
@@ -298,6 +300,7 @@ function stepAir(skier, surfaces, controls, dt, events) {
     skier.airSeconds += dt;
     skier.normalAccel = 0;
     alignInAir(skier, dt);
+    spinInAir(skier, controls, dt);
     return;
   }
   const segment = segmentGeometry(hit.surface, hit.segment);
@@ -314,9 +317,40 @@ function stepAir(skier, surfaces, controls, dt, events) {
   skier.speed = skier.vx * segment.tx + skier.vy * segment.ty;
   skier.curveAccel = 0;
   syncGroundState(skier);
+  judgeStunt(skier, events);
   judgeImpact(skier, Math.max(0, impact), events, 'landing');
   events.push({ type: 'touchdown', impact: Math.max(0, impact), airSeconds, x: skier.x, y: skier.y });
   skier.airSeconds = 0;
+}
+
+/**
+ * After a stunt, compare the body with the slope. Whole turns count as
+ * flips; what is left over is how far off the landing is.
+ */
+function judgeStunt(skier, events) {
+  const spin = skier.spin;
+  skier.spin = 0;
+  skier.spinRate = 0;
+  if (Math.abs(spin) < 0.05 || skier.crashed) return;
+  const turns = Math.round(spin / (2 * Math.PI));
+  const offBy = spin - turns * 2 * Math.PI;
+  const miss = Math.abs(offBy);
+  if (miss > PHYSICS.trickCrashAngle) {
+    skier.crashed = true;
+    events.push({ type: 'crash', impact: 0, kind: offBy > 0 ? 'over-rotated' : 'under-rotated', x: skier.x, y: skier.y });
+    return;
+  }
+  if (miss > PHYSICS.trickSketchyAngle) {
+    events.push({ type: 'hard', impact: PHYSICS.softLandingSpeed + miss * 10, kind: 'sketchy', x: skier.x, y: skier.y });
+  }
+  if (turns >= 1) events.push({ type: 'trick', flips: turns, clean: miss <= PHYSICS.trickSketchyAngle, x: skier.x, y: skier.y });
+}
+
+function spinInAir(skier, controls, dt) {
+  if (skier.crashed) return;
+  if (controls.trick) skier.spinRate = PHYSICS.spinRateTucked;
+  else if (skier.spinRate > PHYSICS.spinRateTucked * PHYSICS.openSpinFactor) skier.spinRate = PHYSICS.spinRateTucked * PHYSICS.openSpinFactor;
+  skier.spin += skier.spinRate * dt;
 }
 
 function alignInAir(skier, dt) {

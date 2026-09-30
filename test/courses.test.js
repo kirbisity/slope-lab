@@ -38,4 +38,8 @@ test('the sandbox demo lands its jump and finishes', () => {
   assert.ok(log.some((event) => event.type === 'takeoff'));
   assert.ok(!log.some((event) => event.type === 'crash' || event.type === 'hard'));
   assert.equal(run.status, 'finished');
+  assert.ok(log.filter((event) => event.type === 'touchdown' && event.airSeconds > 0.5).length >= 2, 'two real jumps');
+  assert.ok(SANDBOX.finish.x > 250, 'the demo is a long run');
+  assert.ok(log.filter((event) => event.type === 'touchdown' && event.airSeconds > 0.5).length >= 2, 'two real jumps');
+  assert.ok(SANDBOX.finish.x > 250, 'the demo is a long run');
 });

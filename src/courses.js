@@ -13,13 +13,24 @@ export const SANDBOX = {
   lesson: 'Every track is a graph of y = f(x). The skier feels its slope, f′(x), as acceleration and its curvature as g-force.',
   start: { x: 1.5, y: 24.9 },
   editableStart: true,
+  // Two jumps, rollers and a drop, 319 m. Built with the Joyride builders
+  // (each landing fitted to a measured takeoff) and frozen as equations.
   pieces: [
     { equation: 'y = 0.035(x-28)^2', fromX: 0, toX: 26 },
     { equation: 'y = -0.3 - 0.14(x-26) - 0.011(x-26)^2', fromX: 26, toX: 58 },
     { equation: 'y = 0.01275(x-91.1)^2 - 30', fromX: 58, toX: 91.1 },
-    { equation: 'y = -30', fromX: 91, toX: 140 },
+    { equation: 'y = -30', fromX: 91.1, toX: 99.1 },
+    { equation: 'y = -30 - 0.0091(x-99.1)^2', fromX: 99.1, toX: 121.1 },
+    { equation: 'y = -34.404 - 0.4(x-121.1) + 0.1034(1 - cos(0.2856(x-121.1)))', fromX: 121.1, toX: 143.1 },
+    { equation: 'y = -43.204 - 0.4(x-143.1) + 0.035(x-143.1)^2', fromX: 143.1, toX: 153.1 },
+    { equation: 'y = -44.504 + 0.2995(x-153.1) - 0.0111(x-153.1)^2', fromX: 153.7, toX: 191 },
+    { equation: 'y = -49.097 - 0.542(x-191) + 0.004(x-191)^2', fromX: 191, toX: 215 },
+    { equation: 'y = -59.801 - 0.35(x-215) - 0.3445(1 - cos(0.1309(x-215)))', fromX: 215, toX: 239 },
+    { equation: 'y = -68.89 - 0.35(x-239) + 0.0438(1 - cos(0.3491(x-239)))', fromX: 239, toX: 257 },
+    { equation: 'y = -75.19 - 0.35(x-257) + 0.0054(x-257)^2', fromX: 257, toX: 285 },
+    { equation: 'y = -80.756 - 0.048(x-285)', fromX: 285, toX: 319 },
   ],
-  finish: { x: 112, yMin: -31, yMax: -26 },
+  finish: { x: 299, yMin: -84, yMax: -77 },
   ink: null,
   stars: [],
 };
@@ -129,13 +140,24 @@ export const CHALLENGES = [
   },
 ];
 
-export const ALL_COURSES = [SANDBOX, ...CHALLENGES];
+// The picker card for Joyride; the slope itself is generated (joyride.js).
+export const JOYRIDE_CARD = {
+  id: 'joyride',
+  name: 'Joyride',
+  difficulty: 'joyride',
+  brief: 'A new random slope every time. No maths needed: tuck, pop and flip.',
+  stars: [{ type: 'finish' }, { type: 'minFlips', value: 1 }, { type: 'maxOuch', value: 0 }],
+};
+
+// Picker order: ride first, then build with equations, then free build.
+export const ALL_COURSES = [JOYRIDE_CARD, ...CHALLENGES, SANDBOX];
 
 export function findCourse(id) {
-  return ALL_COURSES.find((course) => course.id === id) || SANDBOX;
+  return [...CHALLENGES, SANDBOX].find((course) => course.id === id) || SANDBOX;
 }
 
 export const DIFFICULTY_LABELS = {
+  joyride: 'Just ride',
   sandbox: 'Free build',
   green: 'Green circle',
   blue: 'Blue square',

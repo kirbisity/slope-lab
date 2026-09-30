@@ -306,7 +306,7 @@ function physicsFrame(frameSeconds) {
 }
 
 const CRASH_MESSAGES = {
-  sideways: 'Landed sideways! Finish the turn, or stop at 180',
+  sideways: 'Landed sideways! Let go of Spin in time to line up',
   'switch-big-air': 'Too much air to land backwards',
 };
 

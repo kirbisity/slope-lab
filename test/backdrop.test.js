@@ -94,3 +94,30 @@ test('a cached backdrop is reused until parallax would misplace a ridge', async 
   const far = projectBackdrop(nudged, 0, 0, BACKDROP.farDepth).x - projectBackdrop(base, 0, 0, BACKDROP.farDepth).x;
   assert.ok(shift < Math.max(near, far) && shift > Math.min(near, far));
 });
+
+test('land covers the bottom of the screen at every camera height: no void under the course', () => {
+  const sizes = [[390, 844], [844, 390], [1280, 720], [1440, 900]];
+  for (const [width, height] of sizes) {
+    for (const cameraY of [-80, 0, 60, 200]) {
+      const view = createBackdropView(camera({ width, height, y: cameraY }));
+      const { triangles } = buildBackdrop(view);
+      // Every screen row from the horizon down is crossed by land.
+      for (let y = Math.ceil(view.horizonY) + 40; y < height; y += 20) {
+        const covered = triangles.some((triangle) => {
+          const ys = triangle.points.map((point) => point.y);
+          return Math.min(...ys) <= y && Math.max(...ys) >= y;
+        });
+        assert.ok(covered, `${width}x${height}, camera y ${cameraY}: bare at screen y ${y}`);
+      }
+      // And across its width at the very bottom.
+      const bottom = triangles.filter((triangle) => triangle.points.some((point) => point.y >= height));
+      const xs = bottom.flatMap((triangle) => triangle.points.map((point) => point.x));
+      assert.ok(Math.min(...xs) <= 0 && Math.max(...xs) >= width, `${width}x${height}: the bottom edge is not fully covered`);
+    }
+  }
+});
+
+test('the range is a finely faceted mesh: well over the old 1,600 triangles', () => {
+  const { triangles } = buildBackdrop(createBackdropView(camera()));
+  assert.ok(triangles.length > 3000, `${triangles.length} triangles`);
+});

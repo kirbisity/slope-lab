@@ -52,7 +52,7 @@ function ridged(x, y) {
   let amplitude = 1;
   let frequency = 1;
   let norm = 0;
-  for (let octave = 0; octave < 4; octave += 1) {
+  for (let octave = 0; octave < BACKDROP.noiseOctaves; octave += 1) {
     const ridge = 1 - Math.abs(2 * valueNoise(x * frequency, y * frequency) - 1);
     total += ridge * ridge * amplitude;
     norm += amplitude;
@@ -68,7 +68,9 @@ export function heightAt(x, depth) {
   const back = Math.min(1, Math.max(0, (depth - BACKDROP.nearDepth) / span));
   const envelope = BACKDROP.foothillShare + (1 - BACKDROP.foothillShare) * smooth(Math.min(1, back * 1.6));
   const shape = ridged(x / 420, depth / 420);
-  return Math.max(0, BACKDROP.peakHeight * envelope * (shape * 1.35 - 0.2));
+  // In front of the main range the land flattens toward the camera.
+  const foreground = Math.min(1, depth / BACKDROP.nearDepth) ** 2;
+  return Math.max(0, BACKDROP.peakHeight * envelope * (shape * 1.35 - 0.2)) * foreground;
 }
 
 /** The backdrop camera for this frame, derived from the course camera. */
@@ -91,6 +93,10 @@ export function projectBackdrop(view, x, height, depth) {
 
 function rowDepths() {
   const depths = [];
+  for (let row = 0; row < BACKDROP.foregroundRows; row += 1) {
+    const t = row / BACKDROP.foregroundRows;
+    depths.push(BACKDROP.foregroundDepth + (BACKDROP.nearDepth - BACKDROP.foregroundDepth) * t);
+  }
   for (let row = 0; row < BACKDROP.rowCount; row += 1) {
     const t = row / (BACKDROP.rowCount - 1);
     depths.push(BACKDROP.nearDepth + (BACKDROP.farDepth - BACKDROP.nearDepth) * t * t);
@@ -125,9 +131,34 @@ function shadeTriangle(a, b, c, depth) {
   const slope = Math.sqrt(1 - normal.y * normal.y) / Math.max(0.05, normal.y);
   const material = materialFor(height, slope);
   const base = mix(MATERIALS[material].shadow, MATERIALS[material].lit, Math.min(1, light));
-  const back = (depth - BACKDROP.nearDepth) / (BACKDROP.farDepth - BACKDROP.nearDepth);
+  const back = Math.max(0, (depth - BACKDROP.nearDepth) / (BACKDROP.farDepth - BACKDROP.nearDepth));
   const haze = BACKDROP.nearHaze + (BACKDROP.farHaze - BACKDROP.nearHaze) * back;
   return { fill: toRgb(mix(base, HAZE, haze)), material, haze, height };
+}
+
+// The grid is anchored to the world, so a vertex's height and a facet's
+// colour never change: remember them, and a redraw only projects.
+const heightCache = new Map();
+const shadeCache = new Map();
+
+function cachedHeight(column, row, worldX, depth) {
+  const key = column * 64 + row;
+  let height = heightCache.get(key);
+  if (height === undefined) {
+    height = heightAt(worldX, depth);
+    heightCache.set(key, height);
+  }
+  return height;
+}
+
+function cachedShade(column, row, half, a, b, c, depth) {
+  const key = (column * 64 + row) * 2 + half;
+  let shade = shadeCache.get(key);
+  if (shade === undefined) {
+    shade = shadeTriangle(a, b, c, depth);
+    shadeCache.set(key, shade);
+  }
+  return shade;
 }
 
 /**
@@ -142,13 +173,13 @@ export function buildBackdrop(view) {
   const halfSpan = (view.width / 2 + 2) * (BACKDROP.farDepth / view.focal) + spacing;
   const firstColumn = Math.floor((view.eyeX - halfSpan) / spacing);
   const lastColumn = Math.ceil((view.eyeX + halfSpan) / spacing);
-  const grid = depths.map((depth) => {
+  const grid = depths.map((depth, rowIndex) => {
     const row = [];
     for (let column = firstColumn; column <= lastColumn; column += 1) {
       const worldX = column * spacing;
-      const height = heightAt(worldX, depth);
+      const height = cachedHeight(column, rowIndex, worldX, depth);
       const screen = projectBackdrop(view, worldX, height, depth);
-      row.push({ worldX, height, depth, x: screen.x, y: screen.y });
+      row.push({ worldX, height, depth, x: screen.x, y: screen.y, column });
     }
     return row;
   });
@@ -163,12 +194,38 @@ export function buildBackdrop(view) {
       const quad = [back[column], back[column + 1], front[column + 1], front[column]];
       // Skip quads wholly off either side of the screen.
       if (Math.max(quad[0].x, quad[1].x, quad[2].x, quad[3].x) < -2 || Math.min(quad[0].x, quad[1].x, quad[2].x, quad[3].x) > view.width + 2) continue;
-      for (const [a, b, c] of [[quad[0], quad[1], quad[2]], [quad[0], quad[2], quad[3]]]) {
-        triangles.push({ points: [a, b, c], depth, ...shadeTriangle(a, b, c, depth) });
-      }
+      [[quad[0], quad[1], quad[2]], [quad[0], quad[2], quad[3]]].forEach(([a, b, c], half) => {
+        triangles.push({ points: [a, b, c], depth, ...cachedShade(back[column].column, rowIndex, half, a, b, c, depth) });
+      });
     }
   }
+  triangles.push(...skirtBelow(grid[0], grid[1], view));
   return { rows, vertices: grid.flat(), triangles };
+}
+
+/**
+ * The hillside continuing down from the nearest row to past the bottom of
+ * the screen, in the colours of the facets just above it, so the course
+ * never floats over an empty valley. Painted last: it is the nearest land.
+ */
+function skirtBelow(front, behind, view) {
+  const skirt = [];
+  const bottomY = view.height + BACKDROP.skirtPixelsBelow;
+  for (let column = 0; column < front.length - 1; column += 1) {
+    const left = front[column];
+    const right = front[column + 1];
+    const { fill, material, haze, height } = cachedShade(left.column, 63, 0, left, right, behind[column], left.depth);
+    const foot = (point) => {
+      if (point.y >= bottomY) return { ...point };
+      const worldHeight = view.eyeHeight - (bottomY - view.horizonY) * (point.depth / view.focal);
+      return { worldX: point.worldX, height: worldHeight, depth: point.depth, x: point.x, y: bottomY };
+    };
+    const leftFoot = foot(left);
+    const rightFoot = foot(right);
+    skirt.push({ points: [left, right, rightFoot], depth: left.depth, fill, material, haze, height });
+    skirt.push({ points: [left, rightFoot, leftFoot], depth: left.depth, fill, material, haze, height });
+  }
+  return skirt;
 }
 
 // The depth whose parallax a cached backdrop is slid by: between the rows,

@@ -238,11 +238,22 @@ export const VIEW = {
 // own perspective camera, far enough away that zooming the course leaves it
 // alone while panning slides it with true depth parallax.
 export const BACKDROP = {
-  nearDepth: 450,
+  nearDepth: 320,
   farDepth: 1900,
   // Rows packed tighter near the front, where each metre spans more pixels.
-  rowCount: 16,
-  columnSpacing: 20,
+  // ~4,300 triangles on a wide screen (it was ~1,600): the range is drawn once and reused.
+  rowCount: 26,
+  columnSpacing: 12,
+  // Finer ridged noise on top of the broad shape: more facets on each slope.
+  noiseOctaves: 5,
+  // The land keeps coming toward the camera under the course: extra rows
+  // from foregroundDepth out to nearDepth, flattening to low ground the
+  // closer they are so they never tower over the course. Close rows project
+  // far below the screen, so the hillside fills it.
+  foregroundRows: 5,
+  foregroundDepth: 70,
+  // A safety skirt below the nearest row, this many pixels past the screen.
+  skirtPixelsBelow: 240,
   peakHeight: 230,
   // The nearest row keeps to foothills this share of the peaks, rising to
   // full height by the back of the range.

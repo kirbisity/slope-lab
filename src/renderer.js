@@ -2,6 +2,8 @@
 import { VIEW, COLORS, PHYSICS } from './config.js';
 import { project } from './camera.js';
 import { groundBelow } from './track.js';
+import { createBackdropView, buildBackdrop, backdropDrift, cacheShift } from './backdrop.js';
+import { BACKDROP } from './config.js';
 import { sweepSurfaces, dragCoefficient } from './physics.js';
 
 const SNOW_LIT = [250, 252, 255];
@@ -17,11 +19,6 @@ function mix(a, b, t) {
   return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
 }
 
-// Deterministic ridge line, so the mountains do not shimmer between frames.
-function ridge(u, seed) {
-  return Math.sin(u * 0.9 + seed) * 0.5 + Math.sin(u * 2.3 + seed * 1.7) * 0.25 + Math.sin(u * 5.1 + seed * 0.3) * 0.12 + Math.abs(Math.sin(u * 0.37 + seed * 2.1)) * 0.6;
-}
-
 function hash(value) {
   const s = Math.sin(value * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
@@ -29,48 +26,96 @@ function hash(value) {
 
 // ---------------------------------------------------------------- backdrop
 
-function drawSky(ctx, camera) {
+// A brighter, "HDR" sky: a saturated zenith falling to an overexposed,
+// almost white horizon, and a sun that blooms past its disc.
+const SKY = {
+  zenith: '#1d63c9',
+  upper: '#4f97e6',
+  lower: '#a9d4f7',
+  horizon: '#f6fbff',
+  sunX: 0.8,
+  sunY: 0.17,
+};
+
+function drawSky(ctx, camera, view) {
   const { width, height } = camera;
-  const sky = ctx.createLinearGradient(0, 0, 0, height);
-  sky.addColorStop(0, '#2f6fc0');
-  sky.addColorStop(0.55, '#8fbde8');
-  sky.addColorStop(1, '#e4f0fa');
+  const horizon = Math.min(height, Math.max(0, view.horizonY));
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, SKY.zenith);
+  sky.addColorStop(0.45, SKY.upper);
+  sky.addColorStop(0.82, SKY.lower);
+  sky.addColorStop(1, SKY.horizon);
   ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, width, horizon + 1);
+  // Below the horizon: a snowy valley in soft blue shade, so the sunlit
+  // course lanes stay the brightest thing on screen.
+  const valley = ctx.createLinearGradient(0, horizon, 0, height);
+  valley.addColorStop(0, '#d7e7f6');
+  valley.addColorStop(1, '#9db8d9');
+  ctx.fillStyle = valley;
+  ctx.fillRect(0, horizon, width, height - horizon);
 
-  const sunX = width * 0.82;
-  const sunY = height * 0.16;
-  const glow = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, Math.max(width, height) * 0.45);
-  glow.addColorStop(0, 'rgba(255,250,228,0.95)');
-  glow.addColorStop(0.08, 'rgba(255,244,210,0.55)');
-  glow.addColorStop(1, 'rgba(255,244,210,0)');
-  ctx.fillStyle = glow;
+  const sunX = width * SKY.sunX;
+  const sunY = height * SKY.sunY;
+  const reach = Math.max(width, height);
+  const bloom = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, reach * 0.6);
+  bloom.addColorStop(0, 'rgba(255,253,240,1)');
+  bloom.addColorStop(0.03, 'rgba(255,250,230,0.95)');
+  bloom.addColorStop(0.09, 'rgba(255,244,214,0.55)');
+  bloom.addColorStop(0.3, 'rgba(255,240,215,0.16)');
+  bloom.addColorStop(1, 'rgba(255,240,215,0)');
+  ctx.fillStyle = bloom;
   ctx.fillRect(0, 0, width, height);
+}
 
-  const layers = [
-    { parallax: 1.2, base: 0.62, amplitude: 0.26, seed: 1.3, top: '#f4f8fc', bottom: '#9fb7d6', wavelength: 260 },
-    { parallax: 3.5, base: 0.74, amplitude: 0.2, seed: 4.1, top: '#e3edf7', bottom: '#7d9cc4', wavelength: 190 },
-    { parallax: 7, base: 0.86, amplitude: 0.12, seed: 7.7, top: '#cfe0f0', bottom: '#5f83b0', wavelength: 140 },
-  ];
-  for (const layer of layers) {
-    const offset = camera.x * layer.parallax;
-    const lift = camera.y * layer.parallax * 0.25;
-    const baseY = height * layer.base + lift;
-    const gradient = ctx.createLinearGradient(0, baseY - height * layer.amplitude * 1.6, 0, height);
-    gradient.addColorStop(0, layer.top);
-    gradient.addColorStop(0.45, layer.bottom);
-    gradient.addColorStop(1, layer.bottom);
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.moveTo(0, height);
-    for (let x = 0; x <= width + 8; x += 8) {
-      const u = (x + offset) / layer.wavelength;
-      ctx.lineTo(x, baseY - ridge(u, layer.seed) * height * layer.amplitude);
-    }
-    ctx.lineTo(width, height);
-    ctx.closePath();
+function drawBackdrop(ctx, camera, view) {
+  const { triangles } = buildBackdrop(view);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  // Consecutive triangles of one colour share a path; the matching stroke
+  // closes the anti-aliased hairlines between neighbours.
+  let current = null;
+  const flush = () => {
+    if (current === null) return;
     ctx.fill();
+    ctx.stroke();
+  };
+  for (const triangle of triangles) {
+    if (triangle.fill !== current) {
+      flush();
+      current = triangle.fill;
+      ctx.fillStyle = current;
+      ctx.strokeStyle = current;
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+    }
+    const [a, b, c] = triangle.points;
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(c.x, c.y);
+    ctx.closePath();
   }
+  flush();
+
+  // Air between us and the range: low haze over the valley floor, and the
+  // sun's glare washing over the peaks nearest it.
+  const horizon = view.horizonY;
+  const hazeTop = horizon - camera.height * 0.1;
+  const haze = ctx.createLinearGradient(0, hazeTop, 0, camera.height);
+  haze.addColorStop(0, 'rgba(232,243,253,0)');
+  haze.addColorStop(0.3, 'rgba(232,243,253,0.4)');
+  haze.addColorStop(1, 'rgba(170,196,226,0.55)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, hazeTop, camera.width, camera.height - hazeTop);
+  ctx.globalCompositeOperation = 'lighter';
+  const sunX = camera.width * SKY.sunX;
+  const sunY = camera.height * SKY.sunY;
+  const glare = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, Math.max(camera.width, camera.height) * 0.45);
+  glare.addColorStop(0, 'rgba(90,80,50,0.35)');
+  glare.addColorStop(1, 'rgba(90,80,50,0)');
+  ctx.fillStyle = glare;
+  ctx.fillRect(0, 0, camera.width, camera.height);
+  ctx.restore();
 }
 
 function niceStep(pixelsPerMeter) {
@@ -121,6 +166,37 @@ function drawGrid(ctx, camera, editing) {
     }
   }
   ctx.restore();
+}
+
+// The sky and the range change little from frame to frame, so they are
+// painted into an offscreen canvas (with a margin to slide into) and reused
+// until parallax would put a ridge a few pixels out of place.
+let sceneryCache = null;
+
+function drawScenery(ctx, camera) {
+  const view = createBackdropView(camera);
+  const margin = BACKDROP.cacheMarginPixels;
+  if (!sceneryCache || backdropDrift(sceneryCache.view, view) > BACKDROP.redrawDriftPixels) {
+    const width = Math.ceil(camera.width + 2 * margin);
+    const height = Math.ceil(camera.height + 2 * margin);
+    // Match the screen's pixel density so the range stays crisp on retina.
+    const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
+    const pixelWidth = Math.round(width * ratio);
+    const pixelHeight = Math.round(height * ratio);
+    const canvas = sceneryCache && sceneryCache.canvas.width === pixelWidth && sceneryCache.canvas.height === pixelHeight
+      ? sceneryCache.canvas
+      : Object.assign(document.createElement('canvas'), { width: pixelWidth, height: pixelHeight });
+    const cacheContext = canvas.getContext('2d');
+    cacheContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const paddedCamera = { ...camera, width, height };
+    const paddedView = { ...view, width, height, horizonY: view.horizonY + margin };
+    cacheContext.clearRect(0, 0, width, height);
+    drawSky(cacheContext, paddedCamera, paddedView);
+    drawBackdrop(cacheContext, paddedCamera, paddedView);
+    sceneryCache = { canvas, view, width, height };
+  }
+  const shift = cacheShift(sceneryCache.view, view);
+  ctx.drawImage(sceneryCache.canvas, -margin + shift.x, -margin + shift.y, sceneryCache.width, sceneryCache.height);
 }
 
 // ------------------------------------------------------------------ tracks
@@ -662,7 +738,7 @@ function drawPreview(ctx, camera, polylines, colour) {
 /** Draw one frame. `scene` is a plain snapshot assembled by the game. */
 export function renderScene(ctx, camera, scene) {
   const editing = scene.mode === 'edit';
-  drawSky(ctx, camera);
+  drawScenery(ctx, camera);
   drawGrid(ctx, camera, editing && scene.showGrid);
 
   // Lower tracks first, so higher ones sit in front of what is behind them.

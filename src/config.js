@@ -124,6 +124,39 @@ export const VIEW = {
   maxParticles: 260,
 };
 
+// The mountain range behind the course: a lit height-field mesh seen by its
+// own perspective camera, far enough away that zooming the course leaves it
+// alone while panning slides it with true depth parallax.
+export const BACKDROP = {
+  nearDepth: 450,
+  farDepth: 1900,
+  // Rows packed tighter near the front, where each metre spans more pixels.
+  rowCount: 16,
+  columnSpacing: 20,
+  peakHeight: 230,
+  // The nearest row keeps to foothills this share of the peaks, rising to
+  // full height by the back of the range.
+  foothillShare: 0.28,
+  // Focal length as a share of the larger screen side: ~53° across.
+  focalShare: 0.95,
+  horizonShare: 0.56,
+  eyeHeight: 60,
+  // Course metres of height move the eye this much: enough to feel, not
+  // enough that a 100 m drop swings the range off screen.
+  verticalParallax: 0.35,
+  snowLine: 105,
+  treeLine: 42,
+  // Steeper than this, snow will not stay: bare rock shows.
+  snowMaxSlope: 1.1,
+  // Share of the way to the sky colour at the farthest row.
+  farHaze: 0.6,
+  nearHaze: 0.1,
+  // The rendered backdrop is reused, slid by a middle depth's parallax,
+  // until near and far ridges would be this many pixels out of place.
+  redrawDriftPixels: 3,
+  cacheMarginPixels: 12,
+};
+
 export const COLORS = {
   pieces: ['#e2552d', '#2f7dd1', '#20a36b', '#9b4fd1', '#d19a1b', '#d13f8a'],
   locked: '#23324a',

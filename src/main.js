@@ -1260,7 +1260,7 @@ resizeCanvas();
 loadCourse(loadPreference('course', JOYRIDE_ID));
 if (!loadPreference('welcomed', false)) {
   savePreference('welcomed', true);
-  setTimeout(() => toast('Press Ride. Hold Flip in the air, let go to land.'), 400);
+  setTimeout(() => toast('Press Ride. Spin pops and turns; let go to land facing forward.'), 400);
 }
 requestAnimationFrame(frame);
 window.slopeLab = { state, startRide, backToEdit, loadCourse, fitView, advance };

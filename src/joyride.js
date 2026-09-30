@@ -6,11 +6,12 @@ import { PHYSICS } from './config.js';
 import { createEquationPiece, buildSurfaces } from './track.js';
 import { compileEquation } from './expression.js';
 import { createRun, stepRun, simulateRun } from './run.js';
+import { createSkier, placeOnSurface, stepSkier } from './physics.js';
 
 export const JOYRIDE_ID = 'joyride';
 // Bump when the generator changes: the same seed then makes a different
 // slope, and ghosts recorded on the old one must not race on the new.
-export const JOYRIDE_VERSION = 2;
+export const JOYRIDE_VERSION = 3;
 const MAX_ATTEMPTS = 24;
 
 /** Deterministic random numbers from a seed (mulberry32). */
@@ -105,11 +106,105 @@ function drop(course, length, depth) {
   push(course, `y = ${fixed(y)}${slopeTerm(slope, x)} - ${precise(safeDepth / 2)}(1 - cos(${precise(k)}${shifted(x)}))`, x, x + length);
 }
 
+// Moguls reward speed control: crests are sized so a rider who has slowed
+// to this speed holds the snow over them (v²κ just under g·cosθ). Faster
+// riders are thrown off the crests, and where they land decides whether
+// they ride on or hit the face of the next bump.
+const MOGUL_CONTROLLED_SPEED = 10;
+const MOGUL_CREST_SHARE_OF_G = 0.95;
+// A mogul field is test-ridden hands-off as it is built; each try that
+// lands hard shrinks the bumps by this share, up to MOGUL_TRIES times.
+const MOGUL_SHRINK = 0.75;
+const MOGUL_TRIES = 6;
+
+/**
+ * Ride what is built so far hands-off from the start to `endX`. Returns
+ * true if the skier gets there without a hard landing or a crash.
+ */
+function ridesCleanTo(course, start, endX) {
+  const pieces = course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
+  const run = createRun({ start, finish: null }, pieces, buildSurfaces(pieces));
+  // Clean means back on the snow past the end, not still flying over it.
+  const arrived = () => run.skier.x >= endX && run.skier.mode === 'ground';
+  while (run.status === 'running' && run.time < 120 && !arrived()) {
+    for (const event of stepRun(run, {})) {
+      if (event.type === 'hard' || event.type === 'crash') return false;
+    }
+  }
+  return run.status === 'running' && arrived();
+}
+
+/** Hands-off speed on arriving at `x`, riding what is built so far. */
+function speedArriving(course, start, x) {
+  const pieces = course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
+  const run = createRun({ start, finish: null }, pieces, buildSurfaces(pieces));
+  while (run.status === 'running' && run.time < 90 && run.skier.x < x - 0.5) stepRun(run, {});
+  return run.status === 'running' ? Math.hypot(run.skier.vx, run.skier.vy) : null;
+}
+
+/**
+ * Ride just these pieces hands-off from their start at `speed` to `endX`.
+ * Returns true if the skier gets there without a hard landing or a crash.
+ */
+function ridesCleanFrom(specs, speed, endX) {
+  const pieces = specs.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
+  const surfaces = buildSurfaces(pieces);
+  const first = compileEquation(specs[0].equation);
+  const skier = createSkier({ x: specs[0].fromX + 0.05, y: first(specs[0].fromX + 0.05) + 0.02 });
+  if (!placeOnSurface(skier, surfaces, speed, 1)) return false;
+  const arrived = () => skier.x >= endX && skier.mode === 'ground';
+  for (let step = 0; step < 90 / PHYSICS.stepSeconds && !arrived(); step += 1) {
+    for (const event of stepSkier(skier, surfaces, {})) {
+      if (event.type === 'hard' || event.type === 'crash') return false;
+    }
+    if (skier.mode === 'air' && skier.x > specs[specs.length - 1].toX) return false;
+  }
+  return arrived();
+}
+
+// Moguls: a train of 1 − cos bumps, closer set and taller than rollers.
+// A hands-off rider hops them and is made to land clean (each try is
+// test-ridden, with a short run-out after the field so the ride can land);
+// arrive faster or at another speed and a hop can end on the face of the
+// next bump, hard enough to crash. Braking down to a controlled speed
+// first rides them on the snow.
+function moguls(course, start, count, wavelength, height) {
+  const { x, y, slope } = course;
+  const speed = speedArriving(course, start, x);
+  if (speed === null) return false;
+  const k = (2 * Math.PI) / wavelength;
+  const endX = x + count * wavelength;
+  const cosine = 1 / Math.hypot(1, slope);
+  const onTheEdge = (2 * MOGUL_CREST_SHARE_OF_G * PHYSICS.gravity * cosine) / (MOGUL_CONTROLLED_SPEED ** 2 * k * k);
+  let bumpHeight = Math.min(height, onTheEdge);
+  for (let attempt = 0; attempt < MOGUL_TRIES; attempt += 1) {
+    const equation = `y = ${fixed(y)}${slopeTerm(slope, x)} + ${precise(bumpHeight / 2)}(1 - cos(${precise(k)}${shifted(x)}))`;
+    const runOutY = compileEquation(equation)(endX);
+    const runOut = { equation: `y = ${fixed(runOutY)}${slopeTerm(slope, endX)}`, fromX: fixed(endX), toX: fixed(endX + 14) };
+    // Quick check from the arrival speed first; then the real ride from the
+    // top, which also catches arriving in the air or at another speed.
+    if (ridesCleanFrom([{ equation, fromX: fixed(x), toX: fixed(endX) }, runOut], speed, endX + 10)) {
+      push(course, equation, x, endX);
+      cruise(course, 14);
+      const clean = ridesCleanTo(course, start, endX + 10);
+      course.pieces.splice(-2, 2);
+      Object.assign(course, { x, y, slope });
+      if (clean) {
+        push(course, equation, x, endX);
+        return true;
+      }
+    }
+    bumpHeight *= MOGUL_SHRINK;
+  }
+  roller(course, count * wavelength, height);
+  return true;
+}
+
 /** Ride what is built so far until the skier leaves the lip. */
 function takeoffFrom(course, start, lipX) {
   const pieces = course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
   const run = createRun({ start, finish: null }, pieces, buildSurfaces(pieces));
-  while (run.status === 'running' && run.time < 60) {
+  while (run.status === 'running' && run.time < 150) {
     for (const event of stepRun(run, {})) {
       if (event.type === 'takeoff' && Math.abs(event.x - lipX) < 0.5) return { vx: run.skier.vx, vy: run.skier.vy };
     }
@@ -155,13 +250,16 @@ function buildCandidate(seed) {
   // At least two kickers: at speed the crest limit keeps rollers and drops
   // gentle, so the jumps are what makes each slope feel different.
   // Long runs: twelve to fifteen features between the opening and closing kickers.
-  const middle = Array.from({ length: 12 + Math.floor(random() * 4) }, () => ['roller', 'drop', 'kicker', 'cruise'][Math.floor(random() * 4)]);
+  const middle = Array.from({ length: 12 + Math.floor(random() * 4) }, () => ['roller', 'drop', 'kicker', 'cruise', 'moguls'][Math.floor(random() * 5)]);
+  // Every slope has at least one mogul field, somewhere in the middle.
+  middle.splice(Math.floor(random() * middle.length), 0, 'moguls');
   const features = ['kicker', ...middle, 'kicker'];
   if (random() < 0.5) features.unshift(random() < 0.5 ? 'roller' : 'drop');
   for (const feature of features) {
     if (feature === 'roller') roller(course, pick(20, 32), pick(0.8, 2.2));
     if (feature === 'drop') drop(course, pick(18, 30), pick(3, 7));
     if (feature === 'cruise') cruise(course, pick(14, 26));
+    if (feature === 'moguls' && !moguls(course, start, 3 + Math.floor(random() * 3), pick(12, 20), pick(1.4, 2.6))) return null;
     if (feature === 'kicker') {
       if (!kicker(course, start, pick(8, 12), pick(0.1, 0.35), pick(1.6, 2.2))) return null;
       bend(course, pick(0.3, 0.45), pick(22, 32));
@@ -177,7 +275,7 @@ function buildCandidate(seed) {
     difficulty: 'joyride',
     seed,
     brief: 'A fresh slope every time. Just ride: tuck for speed, press Spin to pop and turn, and let go in time to land facing forward.',
-    lesson: 'Every slope here is made of equations: rollers are 1 − cos humps, drops are half cosines, and each landing hill is the flight parabola y ≈ y₀ + (vy/vx)d − (g/2vx²)d², measured from a real takeoff.',
+    lesson: 'Every slope here is made of equations: rollers and moguls are 1 − cos humps, drops are half cosines, and each landing hill is the flight parabola y ≈ y₀ + (vy/vx)d − (g/2vx²)d², measured from a real takeoff.',
     start,
     pieces: course.pieces,
     finish: { x: finishX, yMin: finishY - 3, yMax: finishY + 5 },
@@ -203,7 +301,7 @@ export function generateJoyride(seed) {
   return null;
 }
 
-export const joyrideBuilders = { builder, cruise, bend, roller, drop, kicker };
+export const joyrideBuilders = { builder, cruise, bend, roller, drop, kicker, moguls };
 
 export function randomSeed() {
   return Math.floor(Math.random() * 1e9);

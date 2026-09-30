@@ -54,9 +54,10 @@ export const PHYSICS = {
   // Off upright at touchdown: past the first a sketchy landing, past the
   // second the skier lands on their back.
   flipCleanAngle: 0.3,
-  flipSafeAngle: 0.6,
-  // Flips stop a little off upright the same way spins stop off heading.
-  flipSpotError: 0.9,
+  flipSafeAngle: 0.5,
+  // Flips stop off upright the same way spins stop off heading, but worse:
+  // the rider sees the snow for only part of the rotation.
+  flipSpotError: 1.2,
   // The rider sees the landing coming: this often (s) they look ahead along
   // the flight, and they start lining up with this much time to spare.
   landingLookAheadSeconds: 0.05,
@@ -66,7 +67,7 @@ export const PHYSICS = {
   // shape keeps most stops close; lower makes the line-up weaker. The share
   // of spins that crash is 1 − (safe angle / spinSpotError)^(1/shape): with
   // shape 3 and 1.1 rad about 10% of forward landings and 29% of the
-  // tighter switch ones; flips about 13%.
+  // tighter switch ones; flips about 25%.
   spotErrorShape: 3,
   spinSpotError: 1.1,
   // Skis align with the flight path this fast while airborne (rad/s).

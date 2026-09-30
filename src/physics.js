@@ -385,6 +385,10 @@ function judgeLanding(skier, airSeconds, events) {
   skier.flip = 0;
   skier.flipRate = 0;
   skier.flipping = false;
+  // A tap is for the jump it was made on: one that never found air enough
+  // is forgotten at the landing rather than firing off a later lip.
+  skier.spinArmed = false;
+  skier.flipArmed = false;
   if (skier.crashed) return;
   const flipResult = flipOutcome(flip);
   if (flipResult.crash) {

@@ -76,6 +76,50 @@ export const DEBRIS = {
   restSpeed: 0.25,
 };
 
+// How the body answers loads while skiing: each part is a damped spring.
+// Frequencies (rad/s) and damping ratios below 1 give the overshoot and
+// rebound that read as weight; the gains turn loads into pose.
+export const BODY = {
+  // Knees and hips: rest crouch on flat snow, extra crouch per g above 1,
+  // and how hard a landing (m/s into the snow) kicks them down.
+  standingCrouch: 0.22,
+  crouchPerG: 0.3,
+  airCrouch: 0.05,
+  crouchFrequency: 12,
+  crouchDamping: 0.35,
+  impactKick: 0.14,
+  // Torso lean (rad) per g of slowing down; forward when braking.
+  leanPerG: 0.9,
+  leanFrequency: 8,
+  leanDamping: 0.5,
+  // Arms and head hang off the torso and swing when it changes.
+  armFrequency: 6,
+  armDamping: 0.25,
+  armCoupling: 1,
+  headFrequency: 10,
+  headDamping: 0.4,
+  headCoupling: 0.6,
+  limit: 1.5,
+};
+
+// The crash ragdoll: jointed points with momentum, folding and rolling.
+export const RAGDOLL = {
+  substeps: 4,
+  constraintPasses: 6,
+  airDamping: 0.999,
+  // Kept per contact substep: snow grips a tumbling body.
+  contactFriction: 0.25,
+  // Contact margin keeps joints just clear of the surface they touch.
+  contactLift: 0.005,
+  // Joints that touched snow in the last few substeps are dragged by it
+  // (velocity kept per substep), which ends slow creep and buzzing contacts.
+  snowDragSubsteps: 4,
+  snowDrag: 0.93,
+  // Nearly still for this long and the body sleeps: it stops simulating.
+  sleepSpeed: 0.45,
+  sleepSeconds: 0.5,
+};
+
 export const SCORING = {
   // Joy for each half turn (180°) landed.
   joyPerHalfTurn: 30,

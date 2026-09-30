@@ -66,6 +66,7 @@ course is proven solvable.
 | `src/storage.js` | Course files (including old Skateboarding saves), progress |
 | `src/joyride.js` | The random slope generator and its hands-off validation |
 | `src/debris.js` | Skis, poles and helmet thrown off in a crash, each with its own physics |
+| `src/ragdoll.js` | The body: load-driven springs while skiing, a Verlet ragdoll that folds and rolls in a crash |
 | `src/ghost.js`, `src/audio.js` | Best-run ghost recording; procedural sound |
 
 ```sh

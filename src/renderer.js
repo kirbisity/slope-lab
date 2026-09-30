@@ -3,7 +3,7 @@ import { VIEW, COLORS, PHYSICS } from './config.js';
 import { project } from './camera.js';
 import { groundBelow } from './track.js';
 import { createBackdropView, buildBackdrop, backdropDrift, cacheShift } from './backdrop.js';
-import { BACKDROP } from './config.js';
+import { BACKDROP, BODY } from './config.js';
 import { sweepSurfaces, dragCoefficient } from './physics.js';
 
 const SNOW_LIT = [250, 252, 255];
@@ -460,7 +460,54 @@ const POSES = {
   tuck: { knee: [0.4, 0.4], hip: [-0.1, 0.6], shoulder: [0.42, 0.98], head: [0.62, 1.1], hand: [0.72, 0.72], poleTip: [-0.55, 0.95] },
   brake: { knee: [0.26, 0.5], hip: [-0.14, 0.88], shoulder: [-0.02, 1.4], head: [0.04, 1.6], hand: [0.36, 1.02], poleTip: [-0.3, 0.03] },
   air: { knee: [0.3, 0.55], hip: [-0.02, 0.9], shoulder: [0.24, 1.38], head: [0.32, 1.57], hand: [0.62, 1.22], poleTip: [-0.25, 0.6] },
+  // Knees and hips taking a heavy load: what a hard compression looks like.
+  compressed: { knee: [0.42, 0.34], hip: [-0.2, 0.52], shoulder: [0.22, 0.96], head: [0.3, 1.14], hand: [0.52, 0.66], poleTip: [-0.5, 0.05] },
 };
+
+function rotateAbout(point, centre, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const dx = point[0] - centre[0];
+  const dy = point[1] - centre[1];
+  return [centre[0] + dx * cos - dy * sin, centre[1] + dx * sin + dy * cos];
+}
+
+/**
+ * The skier's joints in skier-local metres (+x forward, +y up, feet at the
+ * origin): the stance for the moment, bent by the body's springs.
+ */
+export function skierPose(skier, look) {
+  const base = skier.mode === 'air' ? POSES.air : POSES.upright;
+  const target = look.brake ? POSES.brake : base;
+  const pose = {};
+  for (const joint of Object.keys(POSES.upright)) pose[joint] = lerpPoint(target[joint], POSES.tuck[joint], look.tuck);
+  const body = look.body;
+  if (!body) return pose;
+  // Knees give under load: toward the compressed stance, or a little past
+  // the stance the other way when unweighted.
+  const give = Math.max(-0.3, Math.min(1, (body.crouch - BODY.standingCrouch) / (1 - BODY.standingCrouch)));
+  for (const joint of Object.keys(pose)) pose[joint] = lerpPoint(pose[joint], POSES.compressed[joint], give);
+  // The torso leans about the hips; forward is clockwise in these axes.
+  for (const joint of ['shoulder', 'head', 'hand', 'poleTip']) pose[joint] = rotateAbout(pose[joint], pose.hip, -body.lean);
+  // Arms swing about the shoulder and the head nods about the neck.
+  for (const joint of ['hand', 'poleTip']) pose[joint] = rotateAbout(pose[joint], pose.shoulder, -body.armSwing);
+  pose.head = rotateAbout(pose.head, pose.shoulder, -body.headLag * 0.5);
+  return pose;
+}
+
+/** The same joints in world metres, as a crash ragdoll starts from them. */
+export function skierJointsInWorld(skier, look) {
+  const pose = skierPose(skier, look);
+  const cos = Math.cos(look.pitch);
+  const sin = Math.sin(look.pitch);
+  const world = ([x, y]) => ({ x: skier.x + skier.facing * (x * cos - y * sin), y: skier.y + x * sin + y * cos });
+  const hand = world(pose.hand);
+  const shoulder = world(pose.shoulder);
+  return {
+    foot: world([0, 0.08]), knee: world(pose.knee), hip: world(pose.hip), shoulder, head: world(pose.head), hand,
+    elbow: { x: (shoulder.x + hand.x) / 2, y: (shoulder.y + hand.y) / 2 - 0.08 },
+  };
+}
 
 const SKIER_PALETTE = { jacket: COLORS.jacket, sleeve: '#c9461f', pants: COLORS.pants, farLeg: '#18243a', farSki: '#8a2f17', helmet: '#f4f6fa', goggles: '#e8a33a', pole: '#6a7383' };
 const GHOST_PALETTE = { jacket: '#2f7dd1', sleeve: '#2a6cb6', pants: '#1d4f8f', farLeg: '#1d4f8f', farSki: '#2a6cb6', helmet: '#e8f1fb', goggles: '#9cc4f0', pole: '#4a6d96' };
@@ -512,10 +559,7 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
   if (skier.crashed) ctx.rotate(-look.tumble);
   ctx.scale(scale, -scale);
 
-  const base = skier.mode === 'air' ? POSES.air : POSES.upright;
-  const target = look.brake ? POSES.brake : base;
-  const pose = {};
-  for (const joint of Object.keys(POSES.upright)) pose[joint] = lerpPoint(target[joint], POSES.tuck[joint], look.tuck);
+  const pose = skierPose(skier, look);
 
   const line = (from, to, width, color) => {
     ctx.strokeStyle = color;
@@ -555,6 +599,39 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
     ctx.beginPath(); ctx.arc(pose.head[0] - 0.02, pose.head[1] + 0.03, 0.12, Math.PI * 0.05, Math.PI * 1.05); ctx.fill();
   }
   ctx.restore();
+  ctx.restore();
+}
+
+function drawRagdoll(ctx, camera, ragdoll) {
+  const points = ragdoll.points;
+  const at = (name, offset = 0) => project(camera, points[name].x + offset, points[name].y, 0);
+  const scale = at('hip').scale;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const limb = (names, width, colour, offset = 0) => {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = Math.max(2, width * scale);
+    ctx.beginPath();
+    names.forEach((name, index) => {
+      const point = at(name, offset);
+      if (index === 0) ctx.moveTo(point.x, point.y); else ctx.lineTo(point.x, point.y);
+    });
+    ctx.stroke();
+  };
+  // The far leg and arm trail a little behind, darker, for depth.
+  limb(['foot', 'knee', 'hip'], 0.18, SKIER_PALETTE.farLeg, 0.08);
+  limb(['shoulder', 'elbow', 'hand'], 0.12, '#a93c1b', 0.08);
+  limb(['foot', 'knee', 'hip'], 0.19, SKIER_PALETTE.pants);
+  limb(['hip', 'shoulder'], 0.34, SKIER_PALETTE.jacket);
+  limb(['shoulder', 'elbow', 'hand'], 0.13, SKIER_PALETTE.sleeve);
+  const head = at('head');
+  ctx.fillStyle = '#f1c7a3';
+  ctx.beginPath(); ctx.arc(head.x, head.y, 0.12 * scale, 0, Math.PI * 2); ctx.fill();
+  const neck = at('shoulder');
+  const away = Math.atan2(head.y - neck.y, head.x - neck.x);
+  ctx.fillStyle = '#3b2a20';
+  ctx.beginPath(); ctx.arc(head.x, head.y, 0.12 * scale, away - Math.PI * 0.55, away + Math.PI * 0.55); ctx.fill();
   ctx.restore();
 }
 
@@ -770,7 +847,9 @@ export function renderScene(ctx, camera, scene) {
 
   if (scene.run) {
     drawGrooves(ctx, camera, scene.run.grooves);
-    drawShadow(ctx, camera, scene.run.surfaces, scene.run.skier);
+    // After a crash the shadow belongs under the tumbling body.
+    const shadowCaster = scene.ragdoll ? { x: scene.ragdoll.points.hip.x, y: scene.ragdoll.points.hip.y } : scene.run.skier;
+    drawShadow(ctx, camera, scene.run.surfaces, shadowCaster);
     if (scene.prediction) drawPrediction(ctx, camera, scene.prediction);
     if (scene.ghost) {
       const ghostSkier = { ...scene.ghost, mode: 'air', crashed: false };
@@ -784,7 +863,8 @@ export function renderScene(ctx, camera, scene) {
       ctx.fillText('BEST', tag.x, tag.y);
       ctx.restore();
     }
-    drawSkier(ctx, camera, scene.run.skier, scene.look);
+    if (scene.ragdoll) drawRagdoll(ctx, camera, scene.ragdoll);
+    else drawSkier(ctx, camera, scene.run.skier, scene.look);
   }
   if (scene.gear && scene.gear.length) drawGear(ctx, camera, scene.gear);
   drawParticles(ctx, camera, scene.particles);

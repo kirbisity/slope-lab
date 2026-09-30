@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slope Lab</title>
+<meta name="description" content="Design ski runs with y = f(x) and watch real physics ride them.">
+<meta name="theme-color" content="#2f6fc0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="slopelab.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pan" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/></symbol>
+  <symbol id="i-draw" viewBox="0 0 24 24"><path d="M4 20c3-1 4-6 8-7s6-6 8-9"/><path d="M3 21l2-.5"/></symbol>
+  <symbol id="i-erase" viewBox="0 0 24 24"><path d="M8 20h12M5.5 14.5l7-7 5 5-6 6H9z"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 22V3M6 4l12 4-12 5"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-fx" viewBox="0 0 24 24"><path d="M9 20c1.5 0 2-1 2.4-3l2-10c.4-2 1-3 2.6-3M8 10h7M15 14l5 6M20 14l-5 6"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-load" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 20h16"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h4v16H7zM14 4h4v16h-4z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></symbol>
+  <symbol id="i-mountain" viewBox="0 0 24 24"><path d="M2 20l7-12 4 6 3-4 6 10z"/><path d="M7.3 11l1.7 1.5 1.6-1.4"/></symbol>
+</svg>
+
+<main id="app">
+  <canvas id="scene" aria-label="Ski course. Drag to pan, pinch or scroll to zoom."></canvas>
+
+  <header class="topbar">
+    <button class="brand" id="courses-button" type="button" aria-haspopup="dialog">
+      <svg class="icon"><use href="#i-mountain"/></svg>
+      <span class="brand-name">Slope Lab</span>
+    </button>
+    <div class="course-chip" id="course-chip">
+      <span class="sign" id="course-sign" data-difficulty="sandbox"></span>
+      <span class="course-name" id="course-name">Sandbox</span>
+      <span class="course-stars" id="course-stars"></span>
+    </div>
+    <dl class="scores" aria-live="off">
+      <div><dt>Joy</dt><dd id="joy">0</dd></div>
+      <div><dt>Ouch</dt><dd id="ouch">0</dd></div>
+      <div><dt>Score</dt><dd id="score">0</dd></div>
+    </dl>
+    <button class="icon-button" id="mute-button" type="button" aria-pressed="false" aria-label="Sound"><svg class="icon"><use href="#i-sound"/></svg></button>
+    <button class="icon-button" id="help-button" type="button" title="How it works (?)" aria-label="How it works"><svg class="icon"><use href="#i-help"/></svg></button>
+  </header>
+
+  <nav class="tools" id="tools" aria-label="Build tools">
+    <button class="tool" data-tool="pan" type="button" aria-pressed="true" title="Move the view (V)"><svg class="icon"><use href="#i-pan"/></svg><span>Move</span></button>
+    <button class="tool" data-tool="draw" type="button" aria-pressed="false" title="Sketch a track (D)"><svg class="icon"><use href="#i-draw"/></svg><span>Sketch</span></button>
+    <button class="tool" data-tool="erase" type="button" aria-pressed="false" title="Erase tracks (E)"><svg class="icon"><use href="#i-erase"/></svg><span>Erase</span></button>
+    <button class="tool" data-tool="flag" type="button" aria-pressed="false" title="Move the start (S)" id="flag-tool"><svg class="icon"><use href="#i-flag"/></svg><span>Start</span></button>
+    <span class="tool-gap" aria-hidden="true"></span>
+    <button class="tool" id="tracks-toggle" type="button" aria-expanded="false" title="Equations (T)"><svg class="icon"><use href="#i-fx"/></svg><span>y = f(x)</span></button>
+    <button class="tool" id="fit-button" type="button" title="Fit the course (F)"><svg class="icon"><use href="#i-fit"/></svg><span>Fit</span></button>
+    <button class="tool secondary" id="save-button" type="button" title="Save course to a file"><svg class="icon"><use href="#i-save"/></svg><span>Save</span></button>
+    <button class="tool secondary" id="load-button" type="button" title="Open a course file"><svg class="icon"><use href="#i-load"/></svg><span>Open</span></button>
+  </nav>
+
+  <div class="ride-bar">
+    <button class="ride-button" id="ride-button" type="button" title="Ride (Enter)"><svg class="icon"><use href="#i-play"/></svg><span id="ride-label">Ride</span></button>
+    <button class="icon-button round" id="reset-button" type="button" title="Back to editing (R)" aria-label="Back to editing"><svg class="icon"><use href="#i-reset"/></svg></button>
+  </div>
+
+  <section class="readout" id="readout" aria-label="Physics readout">
+    <button class="speed" id="speed-button" type="button" title="Change units">
+      <span class="speed-value" id="speed-value">0</span>
+      <span class="speed-unit" id="speed-unit">km/h</span>
+    </button>
+    <dl class="gauges">
+      <div><dt>height</dt><dd id="gauge-height">0.0 m</dd></div>
+      <div><dt>slope</dt><dd id="gauge-slope">0°</dd></div>
+      <div><dt>g-force</dt><dd id="gauge-g">1.0 g</dd></div>
+      <div><dt>air</dt><dd id="gauge-air">0.0 s</dd></div>
+    </dl>
+    <p class="cursor-readout" id="cursor-readout">x 0.0 &nbsp; y 0.0</p>
+  </section>
+
+  <div class="ride-controls" id="ride-controls" hidden>
+    <button class="hold" id="brake-button" type="button" data-control="brake"><strong>Brake</strong><kbd>←</kbd></button>
+    <div class="hold-pair">
+      <button class="hold" id="tuck-button" type="button" data-control="tuck"><strong>Tuck</strong><kbd>↓</kbd></button>
+      <button class="hold jump" id="jump-button" type="button" data-control="jump"><strong>Pop</strong><kbd>Space</kbd></button>
+    </div>
+  </div>
+
+  <aside class="tracks-panel" id="tracks-panel" aria-label="Equations" hidden>
+    <div class="panel-head">
+      <h2>Tracks</h2>
+      <div class="ink" id="ink" hidden><span class="ink-bar"><span id="ink-fill"></span></span><span id="ink-text">0 / 60 m</span></div>
+      <button class="icon-button" id="tracks-close" type="button" aria-label="Close equations"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+    <p class="brief" id="course-brief"></p>
+    <form class="equation-form" id="equation-form" autocomplete="off">
+      <label class="equation-field">
+        <span class="lhs">y =</span>
+        <input id="equation-input" name="equation" type="text" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="0.05(x+5)^2" aria-label="Equation in x">
+      </label>
+      <div class="range-row">
+        <label><span>from x</span><input id="from-input" name="from" type="text" inputmode="decimal" value="0"></label>
+        <label><span>to x</span><input id="to-input" name="to" type="text" inputmode="decimal" value="30"></label>
+      </div>
+      <div class="keypad" id="keypad" aria-label="Insert">
+        <button type="button" data-insert="x">x</button>
+        <button type="button" data-insert="^">^</button>
+        <button type="button" data-insert="(">(</button>
+        <button type="button" data-insert=")">)</button>
+        <button type="button" data-insert="sin(">sin</button>
+        <button type="button" data-insert="cos(">cos</button>
+        <button type="button" data-insert="sqrt(">√</button>
+        <button type="button" data-insert="pi">π</button>
+      </div>
+      <p class="form-message" id="form-message" role="status"></p>
+      <div class="form-actions">
+        <button class="primary" id="add-button" type="submit">Add track</button>
+        <button id="delete-button" type="button" hidden>Delete</button>
+        <button id="new-button" type="button" hidden>New</button>
+        <select id="sample-select" aria-label="Sample equations"><option value="">Samples…</option></select>
+      </div>
+    </form>
+    <ul class="piece-list" id="piece-list" aria-label="Tracks on this course"></ul>
+    <details class="hint" id="hint-box"><summary id="hint-summary">The maths</summary><p id="lesson-text"></p><p id="hint-text"></p></details>
+  </aside>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <section class="overlay" id="courses-overlay" role="dialog" aria-modal="true" aria-labelledby="courses-title" hidden>
+    <div class="sheet courses-sheet">
+      <div class="sheet-head"><h2 id="courses-title">Choose a slope</h2><button class="icon-button" data-close type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button></div>
+      <div class="course-grid" id="course-grid"></div>
+    </div>
+  </section>
+
+  <section class="overlay" id="help-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <div class="sheet help-sheet">
+      <div class="sheet-head"><h2 id="help-title">How Slope Lab works</h2><button class="icon-button" data-close type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button></div>
+      <div class="help-pages" id="help-pages">
+        <article class="help-page">
+          <h3>1 · Build with maths</h3>
+          <p>Every track is the graph of <code>y = f(x)</code> between two x values. Open <b>y = f(x)</b>, type an equation and add it. Use <code>+ − * / ^ ( )</code>, <code>sin cos tan sqrt abs log exp</code>, <code>pi</code> and <code>e</code>; <code>2x</code> and <code>3(x+1)</code> work too.</p>
+          <p>Or pick <b>Sketch</b> and draw with a finger or mouse; the line is smoothed so small wobbles do not become jumps. <b>Erase</b> removes a track, <b>Start</b> moves the flag.</p>
+        </article>
+        <article class="help-page" hidden>
+          <h3>2 · Ride it</h3>
+          <p>Press <b>Ride</b> (Enter). The skier is on their own, but you can help:</p>
+          <ul class="keys">
+            <li><kbd>↓</kbd> / <kbd>S</kbd> hold to <b>tuck</b>: less drag, more speed</li>
+            <li><kbd>←</kbd> / <kbd>A</kbd> hold to <b>brake</b>: a snowplough, more friction</li>
+            <li><kbd>Space</kbd> / <kbd>↑</kbd> to <b>pop</b> off the snow</li>
+            <li><kbd>R</kbd> back to editing, <kbd>P</kbd> pause, <kbd>M</kbd> sound</li>
+          </ul>
+          <p>On a touchscreen the same three buttons appear at the bottom while you ride. Finish a slope and a ghost of your best run races you next time.</p>
+        </article>
+        <article class="help-page" hidden>
+          <h3>3 · The physics</h3>
+          <p>On snow, gravity pulls along the slope (<i>g</i>·sin θ), friction pushes back (<i>μ</i>·<i>N</i>, μ = 0.045) and air drag grows with speed squared.</p>
+          <p>Over a crest you leave the snow when <i>v</i>²<i>κ</i> &gt; <i>g</i>·cos θ, where κ is the curvature. In the air you follow a parabola. When you land, only the speed <em>into</em> the slope hurts: over 4 m/s is a hard landing, over 11 m/s a wipeout. The dashed arc shows where you will land: green is soft, amber is hard, red is a crash.</p>
+        </article>
+        <article class="help-page" hidden>
+          <h3>4 · Scoring</h3>
+          <p><b>Joy</b> grows with speed above walking pace, and faster in the air. <b>Ouch</b> grows with every hard landing or sharp kink. <b>Score</b> = 50 × Joy ÷ (Ouch + 1), so smooth lines beat rough ones.</p>
+          <p>Each challenge has three stars. Some need a clean run, others need you to go faster or fly longer. Challenges limit how many metres of track (<b>ink</b>) you can add.</p>
+        </article>
+      </div>
+      <div class="pager">
+        <button type="button" id="help-prev">Back</button>
+        <span class="dots" id="help-dots"></span>
+        <button type="button" class="primary" id="help-next">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="overlay" id="result-overlay" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+    <div class="sheet result-sheet">
+      <h2 id="result-title">Finished</h2>
+      <p class="result-line" id="result-line"></p>
+      <dl class="result-stats" id="result-stats"></dl>
+      <ul class="star-list" id="star-list"></ul>
+      <div class="result-actions">
+        <button type="button" id="result-edit">Edit track</button>
+        <button type="button" id="result-again">Ride again</button>
+        <button type="button" class="primary" id="result-next" hidden>Next slope</button>
+      </div>
+    </div>
+  </section>
+
+  <input type="file" id="load-file" accept=".json,application/json" hidden>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

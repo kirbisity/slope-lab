@@ -262,6 +262,8 @@ export const BACKDROP = {
   // far below the screen, so the hillside fills it.
   foregroundRows: 5,
   foregroundDepth: 70,
+  // The shaded range is painted at this share of the screen's resolution.
+  rasterScale: 0.75,
   // A safety skirt below the nearest row, this many pixels past the screen.
   skirtPixelsBelow: 240,
   peakHeight: 255,
@@ -275,9 +277,13 @@ export const BACKDROP = {
   // Course metres of height move the eye this much: enough to feel, not
   // enough that a 100 m drop swings the range off screen.
   verticalParallax: 0.35,
-  snowLine: 105,
-  treeLine: 42,
+  snowLine: 150,
+  treeLine: 62,
   // Snow fades into rock, and rock into forest, over about this many metres.
+  // Slopes are this many times steeper for lighting than for the shape, so
+  // gentle, smooth ridges still catch sun on one side and fall in shadow on
+  // the other.
+  shadingRelief: 5,
   materialBlendMetres: 26,
   // Steeper than this, snow will not stay: bare rock shows.
   snowMaxSlope: 1.1,

@@ -2,7 +2,7 @@
 import { VIEW, COLORS, PHYSICS } from './config.js';
 import { project } from './camera.js';
 import { groundBelow } from './track.js';
-import { createBackdropView, buildBackdrop, backdropDrift, cacheShift } from './backdrop.js';
+import { createBackdropView, buildBackdrop, backdropDrift, cacheShift, rasteriseGouraud } from './backdrop.js';
 import { BACKDROP, BODY } from './config.js';
 import { posedJoints, placeJoints, ragdollJoints, buildSkierMesh, faceNormal, isFrontFacing, MODEL_PALETTE, GHOST_MODEL_PALETTE } from './model.js';
 import { sweepSurfaces, dragCoefficient } from './physics.js';
@@ -69,34 +69,32 @@ function drawSky(ctx, camera, view) {
   ctx.fillRect(0, 0, width, height);
 }
 
+// The range is shaded per vertex and painted by a small software rasteriser
+// at this share of the screen's resolution: colour runs smoothly across every
+// facet, and scaling the image up softens the silhouette a touch.
+let rangeImage = null;
+
 function drawBackdrop(ctx, camera, view) {
   const { triangles } = buildBackdrop(view);
-  ctx.save();
-  ctx.lineJoin = 'round';
-  // Consecutive triangles of one colour share a path; the matching stroke
-  // closes the anti-aliased hairlines between neighbours.
-  let current = null;
-  const flush = () => {
-    if (current === null) return;
-    ctx.fill();
-    ctx.stroke();
-  };
-  for (const triangle of triangles) {
-    if (triangle.fill !== current) {
-      flush();
-      current = triangle.fill;
-      ctx.fillStyle = current;
-      ctx.strokeStyle = current;
-      ctx.lineWidth = 0.9;
-      ctx.beginPath();
-    }
-    const [a, b, c] = triangle.points;
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(c.x, c.y);
-    ctx.closePath();
+  const scale = BACKDROP.rasterScale;
+  const width = Math.ceil(camera.width * scale);
+  const height = Math.ceil(camera.height * scale);
+  if (!rangeImage || rangeImage.canvas.width !== width || rangeImage.canvas.height !== height) {
+    const canvas = Object.assign(document.createElement('canvas'), { width, height });
+    const context = canvas.getContext('2d');
+    rangeImage = { canvas, context, pixels: context.createImageData(width, height) };
   }
-  flush();
+  rangeImage.pixels.data.fill(0);
+  rasteriseGouraud(rangeImage.pixels.data, width, height, scale, triangles);
+  rangeImage.context.putImageData(rangeImage.pixels, 0, 0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  // A touch of blur melts the stair-steps of the silhouette where the
+  // browser supports canvas filters; elsewhere it is simply skipped.
+  if ('filter' in ctx) ctx.filter = 'blur(0.7px)';
+  ctx.drawImage(rangeImage.canvas, 0, 0, width, height, 0, 0, camera.width, camera.height);
+  if ('filter' in ctx) ctx.filter = 'none';
 
   // Air between us and the range: low haze over the valley floor, and the
   // sun's glare washing over the peaks nearest it.

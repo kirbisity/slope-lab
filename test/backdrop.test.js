@@ -162,3 +162,42 @@ test('snow fades into rock and forest over a gradient, not at a hard line', asyn
   }
   assert.ok(jumps / pairs < 0.02, `${jumps} of ${pairs} neighbouring facets jump in colour`);
 });
+
+test('colour runs smoothly across a triangle, vertex to vertex (Gouraud)', async () => {
+  const { rasteriseGouraud } = await import('../src/backdrop.js');
+  const width = 40;
+  const height = 40;
+  const image = new Uint8ClampedArray(width * height * 4);
+  const red = [255, 0, 0];
+  const green = [0, 255, 0];
+  const blue = [0, 0, 255];
+  rasteriseGouraud(image, width, height, 1, [{ points: [{ x: 2, y: 2 }, { x: 38, y: 2 }, { x: 2, y: 38 }], colours: [red, green, blue] }]);
+  const at = (x, y) => Array.from(image.slice((y * width + x) * 4, (y * width + x) * 4 + 4));
+  assert.ok(at(3, 3)[0] > 230 && at(3, 3)[1] < 25, 'near the red vertex it is red');
+  assert.ok(at(36, 3)[1] > 220 && at(36, 3)[0] < 35, 'near the green vertex it is green');
+  const centre = at(14, 14);
+  assert.ok(centre.slice(0, 3).every((value) => value > 60 && value < 110), `the middle blends all three: ${centre}`);
+  assert.equal(at(39, 39)[3], 0, 'outside the triangle stays clear');
+  // Along the top edge from red to green, red only falls and green only rises.
+  for (let x = 4; x < 36; x += 1) {
+    assert.ok(at(x, 3)[0] >= at(x + 1, 3)[0] && at(x, 3)[1] <= at(x + 1, 3)[1]);
+  }
+});
+
+test('neighbouring triangles agree on the colour at a shared vertex, so there are no facet steps', () => {
+  const { triangles } = buildBackdrop(createBackdropView(camera()));
+  const colourAt = new Map();
+  let shared = 0;
+  for (const { points, colours } of triangles) {
+    points.forEach((point, index) => {
+      if (point.y > 720) return;
+      const key = `${point.column},${point.depth}`;
+      const known = colourAt.get(key);
+      if (known) {
+        shared += 1;
+        assert.deepEqual(known, colours[index]);
+      } else colourAt.set(key, colours[index]);
+    });
+  }
+  assert.ok(shared > 5000, `${shared} shared vertices compared`);
+});

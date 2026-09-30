@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSkier, stepSkier, placeOnSurface, landingOutcome } from '../src/physics.js';
+import { createSkier, stepSkier, placeOnSurface, landingOutcome, setRandomSource } from '../src/physics.js';
+import { seededRandom } from '../src/joyride.js';
 import { buildSurfaces, createEquationPiece } from '../src/track.js';
 import { PHYSICS } from '../src/config.js';
 
@@ -8,7 +9,9 @@ const dt = PHYSICS.stepSeconds;
 // These tests pin the line-up with a rider who stops a spin exactly on the
 // heading; the last test measures how often a real, imperfect one crashes.
 const SPOT_ERROR = PHYSICS.spinSpotError;
+const FLIP_SPOT_ERROR = PHYSICS.flipSpotError;
 PHYSICS.spinSpotError = 0;
+PHYSICS.flipSpotError = 0;
 const degrees = (value) => (value * Math.PI) / 180;
 const tucked = PHYSICS.spinRateTucked;
 
@@ -207,13 +210,15 @@ test('landing a flip is judged on being upright', async () => {
   assert.deepEqual(flipOutcome(Math.PI), { crash: 'flip' });
 });
 
-test('real riders stop a spin a little off: about one in ten crashes, flips never', () => {
+test('real riders stop a rotation a little off: some spins and fewer flips crash', () => {
   PHYSICS.spinSpotError = SPOT_ERROR;
+  PHYSICS.flipSpotError = FLIP_SPOT_ERROR;
+  setRandomSource(seededRandom(2026));
   try {
     let spinCrashes = 0;
     let flipCrashes = 0;
     let jumps = 0;
-    // Different in-run speeds make different takeoffs, so different stops.
+    // Each jump draws its own stop error from the seeded source.
     for (let speed = 0; speed < 12; speed += 0.2) {
       const spin = ride({ surfaces: bigJump, start: { x: -39, y: 38.7 }, speed, tapAt: 0.05 });
       const flip = flipRide(bigJump, { x: -39, y: 38.7 }, speed, false, 0.05);
@@ -222,9 +227,38 @@ test('real riders stop a spin a little off: about one in ten crashes, flips neve
       if (flip.skier.crashed) flipCrashes += 1;
     }
     const spinRate = spinCrashes / jumps;
-    assert.ok(spinRate > 0.03 && spinRate < 0.25, `${spinCrashes} of ${jumps} spins crash`);
-    assert.equal(flipCrashes, 0, `${flipCrashes} flips crash`);
+    assert.ok(spinRate > 0.03 && spinRate < 0.3, `${spinCrashes} of ${jumps} spins crash`);
+    assert.ok(flipCrashes / jumps < spinRate, `${flipCrashes} flips crash`);
   } finally {
     PHYSICS.spinSpotError = 0;
+    PHYSICS.flipSpotError = 0;
+    setRandomSource(null);
   }
+});
+
+// ------------------------------------------------------ arming a trick
+
+test('Spin tapped on the snow is armed, and starts at the next takeoff', () => {
+  const skier = createSkier({ x: -39, y: 38.7 });
+  placeOnSurface(skier, bigJump, 0, 1);
+  const events = [];
+  stepSkier(skier, bigJump, { trick: true }, dt);
+  assert.equal(skier.mode, 'ground', 'no hop is forced');
+  assert.equal(skier.spinArmed, true);
+  for (let step = 0; step < 240 * 20 && !events.some((event) => event.type === 'touchdown'); step += 1) events.push(...stepSkier(skier, bigJump, {}, dt));
+  const trick = events.find((event) => event.type === 'trick');
+  assert.ok(trick && trick.degrees >= 360, events.map((event) => event.type).join(','));
+  assert.equal(skier.spinArmed, false, 'used up by the jump it was armed for');
+});
+
+test('Flip tapped with too little air left stays armed for the next jump', () => {
+  // A pop hop is too short to finish a backflip.
+  const skier = createSkier({ x: 0, y: 0.05 });
+  placeOnSurface(skier, gentle, 8, 1);
+  stepSkier(skier, gentle, { jump: true }, dt);
+  // Tapped half way through the hop: a whole backflip no longer fits.
+  for (let step = 0; step < 480 && skier.mode === 'air'; step += 1) stepSkier(skier, gentle, { flip: step === 96 }, dt);
+  assert.equal(skier.mode, 'ground');
+  assert.equal(skier.crashed, false);
+  assert.equal(skier.flipArmed, true, 'still armed after the short hop');
 });

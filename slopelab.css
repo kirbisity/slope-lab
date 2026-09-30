@@ -156,15 +156,17 @@ body.riding .readout { left: calc(12px + var(--safe-left)); }
   bottom: calc(92px + var(--safe-bottom));
   display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; z-index: 4;
 }
-.hold-pair { display: flex; gap: 12px; }
+.hold-pair { display: flex; gap: 10px; }
 .hold {
   pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  width: 84px; height: 84px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8);
-  background: rgba(27, 36, 51, 0.62); color: #fff; box-shadow: var(--shadow);
-  font: 700 17px/1 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase;
+  width: 62px; height: 62px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8);
+  background: rgba(27, 36, 51, 0.55); color: #fff; box-shadow: var(--shadow);
+  font: 700 14px/1 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase;
 }
-.hold kbd { font: 500 10px/1 var(--font-mono); opacity: 0.7; }
+.hold kbd { font: 500 9px/1 var(--font-mono); opacity: 0.7; }
+/* A tapped trick waiting for enough air glows until it starts. */
+.hold.armed { box-shadow: 0 0 0 3px #fff, 0 0 14px 4px rgba(255, 255, 255, 0.8); }
 .hold.jump { background: rgba(226, 85, 45, 0.85); }
 .hold.spin { background: rgba(47, 125, 209, 0.82); }
 .hold.spin.active { background: var(--ice); }
@@ -323,10 +325,10 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .gauges dt { min-width: 0; font-size: 10px; }
   .gauges dd { font-size: 12.5px; min-width: 50px; }
   .ride-controls { bottom: calc(80px + var(--safe-bottom)); }
-  .hold { width: 66px; height: 66px; font-size: 14px; }
+  .hold { width: 50px; height: 50px; font-size: 11.5px; }
   .hold kbd { display: none; }
   /* Four trick buttons as a 2×2 grid under the right thumb. */
-  .hold-pair.tricks { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
+  .hold-pair.tricks { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
   /* The sheet sits on top of the tool bar so the tools stay reachable. */
   .tracks-panel {
     left: calc(6px + var(--safe-left)); right: calc(6px + var(--safe-right)); top: auto; bottom: calc(62px + var(--safe-bottom)); width: auto; max-height: min(58%, 460px);
@@ -367,7 +369,7 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .speed-value { font-size: 21px; }
   .gauges dd { font-size: 12px; }
   .ride-controls { bottom: calc(10px + var(--safe-bottom)); }
-  .hold { width: 64px; height: 64px; font-size: 13px; }
+  .hold { width: 48px; height: 48px; font-size: 11px; }
   .hold kbd { display: none; }
   body.riding .readout { left: calc(8px + var(--safe-left)); }
   body.editing.panel-open .readout { display: none; }

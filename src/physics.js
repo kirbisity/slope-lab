@@ -29,9 +29,11 @@ export function createSkier(start) {
     spin: 0,
     spinRate: 0,
     spinning: false,
+    spinArmed: false,
     flip: 0,
     flipRate: 0,
     flipping: false,
+    flipArmed: false,
     switchStance: false,
     flightLeft: Infinity,
     lookAheadClock: 0,
@@ -102,7 +104,8 @@ function launch(skier, segment, events, reason) {
   skier.flightLeft = Infinity;
   skier.spinning = false;
   skier.flipping = false;
-  skier.spotError = spotErrorFor(skier);
+  skier.spotError = spotErrorFor(PHYSICS.spinSpotError);
+  skier.flipSpotError = spotErrorFor(PHYSICS.flipSpotError);
   events.push({ type: 'takeoff', reason, speed: Math.abs(skier.speed), x: skier.x, y: skier.y });
 }
 
@@ -374,7 +377,8 @@ function judgeLanding(skier, airSeconds, events) {
   // A rider who spun this jump stops a little off the heading they aimed for.
   const spun = Math.abs(skier.spin) > Math.PI / 2;
   const spin = skier.spin + (spun ? skier.spotError || 0 : 0);
-  const flip = skier.flip;
+  const flipped = Math.abs(skier.flip) > Math.PI / 2;
+  const flip = skier.flip + (flipped ? skier.flipSpotError || 0 : 0);
   skier.spin = 0;
   skier.spinRate = 0;
   skier.spinning = false;
@@ -382,8 +386,8 @@ function judgeLanding(skier, airSeconds, events) {
   skier.flipRate = 0;
   skier.flipping = false;
   if (skier.crashed) return;
-  const flipped = flipOutcome(flip);
-  if (flipped.crash) {
+  const flipResult = flipOutcome(flip);
+  if (flipResult.crash) {
     skier.crashed = true;
     events.push({ type: 'crash', impact: 0, kind: 'flip', x: skier.x, y: skier.y });
     return;
@@ -397,20 +401,27 @@ function judgeLanding(skier, airSeconds, events) {
   const wasSwitch = skier.switchStance;
   skier.switchStance = outcome.stance === 'switch';
   if (skier.switchStance && !wasSwitch) events.push({ type: 'switch', x: skier.x, y: skier.y });
-  const clean = outcome.clean && flipped.clean;
+  const clean = outcome.clean && flipResult.clean;
   if (!clean) events.push({ type: 'hard', impact: PHYSICS.softLandingSpeed + 2, kind: 'sketchy', x: skier.x, y: skier.y });
   const halfTurns = Math.round(Math.abs(spin) / Math.PI);
   const flips = Math.round(Math.abs(flip) / (2 * Math.PI));
   if (halfTurns >= 1 || flips >= 1) events.push({ type: 'trick', degrees: halfTurns * 180, flips, clean, x: skier.x, y: skier.y });
 }
 
-// How far off this rider stops a spin on this jump (radians): a fixed
-// pseudo-random draw from where and how fast they took off, so the same
-// jump always lands the same way. u^5 keeps most stops close.
-function spotErrorFor(skier) {
-  const value = Math.sin(skier.x * 12.9898 + skier.y * 78.233 + Math.hypot(skier.vx, skier.vy) * 37.719) * 43758.5453;
-  const unit = (value - Math.floor(value)) * 2 - 1;
-  return PHYSICS.spinSpotError * unit ** 5;
+// Where the rider's luck comes from. A fresh draw per jump: tying it to the
+// takeoff made a hands-off run fail the same jump every single time.
+// Tests swap in a seeded source to stay repeatable.
+let random = Math.random;
+
+export function setRandomSource(source) {
+  random = source || Math.random;
+}
+
+// How far off this rider stops a rotation on this jump (radians).
+// u^5 keeps most stops close and a few well off.
+function spotErrorFor(spread) {
+  const unit = random() * 2 - 1;
+  return spread * unit ** 5;
 }
 
 /**
@@ -448,16 +459,22 @@ function spottedHeading(heading, totalAir) {
 // turning (no holding needed) at the tucked rate while the next landing
 // angle can still be reached before touchdown; then the rider opens up and
 // lines up with the nearest landing angle at the open rate, and holds it.
-function rotate(skier, axis, pressed, dt) {
-  if (pressed) skier[axis.active] = true;
+function rotate(skier, axis, dt) {
   const openRate = axis.tuckedRate * PHYSICS.openSpinFactor;
   const angle = axis.base + skier[axis.angle];
   const target = axis.target(angle);
   const remaining = target - angle;
+  const step = axis.step;
+  const next = Math.floor(angle / step + 1e-9) * step + step;
+  const reachable = (next - angle) / axis.tuckedRate + PHYSICS.landingSpareSeconds <= skier.flightLeft;
+  // An armed trick starts as soon as a whole rotation fits in the air left,
+  // on this jump or a later one.
+  if (skier[axis.armed] && !skier[axis.active] && reachable) {
+    skier[axis.armed] = false;
+    skier[axis.active] = true;
+  }
   if (skier[axis.active]) {
-    const step = axis.step;
-    const next = Math.floor(angle / step + 1e-9) * step + step;
-    if ((next - angle) / axis.tuckedRate + PHYSICS.landingSpareSeconds <= skier.flightLeft) {
+    if (reachable) {
       skier[axis.rate] = axis.tuckedRate;
       skier[axis.angle] += axis.tuckedRate * dt;
       return;
@@ -483,20 +500,20 @@ function rotateInAir(skier, surfaces, controls, dt) {
   const totalAir = skier.airSeconds + skier.flightLeft;
   const shortFlight = totalAir <= PHYSICS.switchMaxAirSeconds;
   rotate(skier, {
-    angle: 'spin', rate: 'spinRate', active: 'spinning',
+    angle: 'spin', rate: 'spinRate', active: 'spinning', armed: 'spinArmed',
     base: skier.switchStance ? Math.PI : 0,
     tuckedRate: PHYSICS.spinRateTucked,
     // Straight back is a landing heading only on a flight short enough to land switch.
     step: shortFlight ? Math.PI : 2 * Math.PI,
     target: (heading) => spottedHeading(heading, totalAir),
-  }, controls.trick, dt);
+  }, dt);
   rotate(skier, {
-    angle: 'flip', rate: 'flipRate', active: 'flipping',
+    angle: 'flip', rate: 'flipRate', active: 'flipping', armed: 'flipArmed',
     base: 0,
     tuckedRate: PHYSICS.flipRateTucked,
     step: 2 * Math.PI,
     target: (pitch) => Math.round(pitch / (2 * Math.PI)) * 2 * Math.PI,
-  }, controls.flip, dt);
+  }, dt);
 }
 
 function alignInAir(skier, dt) {
@@ -513,6 +530,14 @@ function alignInAir(skier, dt) {
  */
 export function stepSkier(skier, surfaces, controls, dt = PHYSICS.stepSeconds) {
   const events = [];
+  // A tap arms a trick, on the snow or in the air; it waits for air enough.
+  if (!skier.crashed) {
+    if (controls.trick) skier.spinArmed = true;
+    if (controls.flip) skier.flipArmed = true;
+  } else {
+    skier.spinArmed = false;
+    skier.flipArmed = false;
+  }
   if (skier.mode === 'ground') stepGround(skier, surfaces, controls, dt, events);
   else stepAir(skier, surfaces, controls, dt, events);
   return events;

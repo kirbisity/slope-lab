@@ -39,10 +39,10 @@ export const PHYSICS = {
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), less;
   // in between the skis are across the fall line and catch an edge.
-  forwardCleanAngle: 0.45,
-  forwardSafeAngle: 0.95,
-  switchCleanAngle: 0.25,
-  switchSafeAngle: 0.5,
+  forwardCleanAngle: 0.4,
+  forwardSafeAngle: 0.8,
+  switchCleanAngle: 0.2,
+  switchSafeAngle: 0.4,
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
@@ -52,15 +52,17 @@ export const PHYSICS = {
   flipRateTucked: 9,
   // Off upright at touchdown: past the first a sketchy landing, past the
   // second the skier lands on their back.
-  flipCleanAngle: 0.35,
-  flipSafeAngle: 0.8,
+  flipCleanAngle: 0.3,
+  flipSafeAngle: 0.6,
+  // Flips stop a little off upright the same way spins stop off heading.
+  flipSpotError: 0.8,
   // The rider sees the landing coming: this often (s) they look ahead along
   // the flight, and they start lining up with this much time to spare.
   landingLookAheadSeconds: 0.05,
   landingSpareSeconds: 0.06,
   // Riders never stop a spin exactly on the heading. Each jump the stop is
-  // off by spinSpotError × u^5, u uniform in ±1 and fixed per takeoff so a
-  // run replays the same: mostly a few degrees, now and then a lot. The
+  // off by spinSpotError × u^5, u drawn fresh in ±1: mostly a few degrees,
+  // now and then a lot. The
   // share of spins that crash is 1 − (safe angle / spinSpotError)^(1/5):
   // with 1.15 rad about 4% of forward landings and 15% of the tighter
   // switch ones, about one tapped spin in ten across Joyride's jumps.

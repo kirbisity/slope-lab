@@ -329,12 +329,18 @@ const CRASH_MESSAGES = {
   'switch-big-air': 'Too much air to land backwards',
 };
 
-// Spin and Flip are taps: on the snow they pop first, so one press chains
-// both; in the air the body's momentum keeps the rotation going to the landing.
+// Spin and Flip are taps that arm the trick: it starts the moment a whole
+// rotation fits in the air (off the next lip, or a Pop), and the body's
+// momentum carries it to the landing.
 function pressTrick(kind) {
-  state.jumpBufferSeconds = 0.15;
   if (kind === 'spin') state.spinBufferSeconds = 0.15;
   else state.flipBufferSeconds = 0.15;
+}
+
+function showArmedTricks() {
+  const skier = state.run && state.run.skier;
+  $('spin-button').classList.toggle('armed', Boolean(skier && skier.spinArmed));
+  $('flip-button').classList.toggle('armed', Boolean(skier && skier.flipArmed));
 }
 
 // The body goes limp where it stands: the ragdoll takes the pose on screen,
@@ -585,6 +591,7 @@ function tick(dt) {
   state.shake *= Math.exp(-SHAKE_DECAY_PER_SECOND * dt);
   draw();
   updateReadout(dt);
+  showArmedTricks();
 }
 
 // Steps the game without the browser's frame clock, which stops in hidden

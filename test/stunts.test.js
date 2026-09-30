@@ -5,6 +5,10 @@ import { buildSurfaces, createEquationPiece } from '../src/track.js';
 import { PHYSICS } from '../src/config.js';
 
 const dt = PHYSICS.stepSeconds;
+// These tests pin the line-up with a rider who stops a spin exactly on the
+// heading; the last test measures how often a real, imperfect one crashes.
+const SPOT_ERROR = PHYSICS.spinSpotError;
+PHYSICS.spinSpotError = 0;
 const degrees = (value) => (value * Math.PI) / 180;
 const tucked = PHYSICS.spinRateTucked;
 
@@ -18,10 +22,11 @@ const bigJump = buildSurfaces([
 const gentle = buildSurfaces([createEquationPiece('y = -0.2x', -5, 300)]);
 
 /**
- * Ride until the first touchdown after takeoff, holding Spin for `hold`
- * seconds from takeoff (Infinity: through the landing). `pop` pops at x = 5.
+ * Ride until the first touchdown after takeoff. Spin is pressed for a single
+ * physics step `tapAt` seconds after takeoff (null: never), or held for
+ * `hold` seconds. `pop` pops at x = 5 (with a tap of Spin when tapAt is 0).
  */
-function ride({ surfaces, start, speed = 0, hold = 0, pop = false, brake = false, extraSeconds = 0, switchStance = false }) {
+function ride({ surfaces, start, speed = 0, hold = 0, tapAt = null, pop = false, brake = false, extraSeconds = 0, switchStance = false }) {
   const skier = createSkier(start);
   assert.ok(placeOnSurface(skier, surfaces, speed, 1), 'the skier starts on the snow');
   skier.switchStance = switchStance;
@@ -32,7 +37,9 @@ function ride({ surfaces, start, speed = 0, hold = 0, pop = false, brake = false
   while (time < 20) {
     const airborne = takeoffTime !== null && landedAt === null;
     const jump = pop && takeoffTime === null && skier.x > 5;
-    const trick = (airborne && time - takeoffTime < hold) || (jump && hold > 0);
+    const sinceTakeoff = airborne ? time - takeoffTime : -1;
+    const tapped = tapAt !== null && airborne && sinceTakeoff >= tapAt && sinceTakeoff < tapAt + dt;
+    const trick = (airborne && sinceTakeoff < hold) || tapped || (jump && (hold > 0 || tapAt === 0));
     // Brake only after touchdown, so compared runs arrive at the landing alike.
     for (const event of stepSkier(skier, surfaces, { trick, jump, brake: brake && landedAt !== null }, dt)) {
       events.push(event);
@@ -60,51 +67,46 @@ test('the scenarios happen: a big jump and a pop hop, with plain landings', () =
   }
 });
 
-test('letting go past halfway completes the turn: a clean 360', () => {
-  const { events, skier } = onBigJump({ hold: degrees(200) / tucked });
-  const trick = events.find((event) => event.type === 'trick');
-  assert.ok(trick, events.map((event) => event.type).join(','));
-  assert.equal(trick.degrees, 360);
-  assert.equal(trick.clean, true);
-  assert.equal(skier.crashed, false);
-});
-
-test('letting go early lines up with the nearest safe heading', () => {
-  // A big jump is too much air to land backwards, so an early let-go unwinds.
-  const big = onBigJump({ hold: degrees(120) / tucked });
-  assert.equal(big.skier.crashed, false);
-  assert.ok(!big.events.some((event) => event.type === 'trick'));
-  assert.equal(big.skier.switchStance, false);
-  // On a hop, straight back is a safe landing too, and it may be the nearer one.
-  const hop = onGentle({ hold: degrees(100) / tucked });
-  assert.equal(hop.skier.crashed, false);
+test('one tap of Spin keeps the skier turning until the landing', () => {
+  const tapped = onBigJump({ tapAt: 0.05 });
+  const held = onBigJump({ hold: Infinity });
+  const tappedTrick = tapped.events.find((event) => event.type === 'trick');
+  assert.ok(tappedTrick, tapped.events.map((event) => event.kind || event.type).join(','));
+  assert.equal(tapped.skier.crashed, false);
+  assert.equal(tappedTrick.degrees, held.events.find((event) => event.type === 'trick').degrees, 'a tap spins as far as holding does');
+  assert.ok(tappedTrick.degrees >= 720, 'as many turns as the air allows');
 });
 
 test('holding Spin right through a jump still lands: the rider lines up in time', () => {
   for (const attempt of [onBigJump({ hold: Infinity }), onGentle({ hold: Infinity })]) {
     assert.equal(attempt.skier.crashed, false, attempt.events.map((event) => event.kind || event.type).join(','));
   }
-  const big = onBigJump({ hold: Infinity });
-  // Holding keeps the full turn rate until the last heading the air allows,
-  // so a long hold on a big jump lands more than a single turn.
-  assert.ok(big.events.find((event) => event.type === 'trick').degrees >= 720, 'a long hold on a big jump lands several turns');
 });
 
-test('any hold, released or not, lands on the big jump and the hop', () => {
-  for (let hold = 0.02; hold < 2; hold += 0.06) {
-    for (const attempt of [onBigJump({ hold }), onGentle({ hold })]) {
-      assert.equal(attempt.skier.crashed, false, `hold ${hold.toFixed(2)} s crashed: ${attempt.events.map((event) => event.kind || event.type).join(',')}`);
+test('a tap at any moment of the flight lands, on the big jump and the hop', () => {
+  for (let tapAt = 0; tapAt < 1.4; tapAt += 0.05) {
+    for (const attempt of [onBigJump({ tapAt }), onGentle({ tapAt })]) {
+      assert.equal(attempt.skier.crashed, false, `tap at ${tapAt.toFixed(2)} s crashed: ${attempt.events.map((event) => event.kind || event.type).join(',')}`);
     }
   }
 });
 
-test('spinning is forgiving: most releases made in the air land', () => {
-  let crashes = 0;
-  const attempts = 60;
-  for (let index = 0; index < attempts; index += 1) {
-    if (onBigJump({ hold: ((index + 0.5) / attempts) * bigAir }).skier.crashed) crashes += 1;
-  }
-  assert.ok(crashes / attempts < 0.35, `${crashes} of ${attempts} crash`);
+test('a later tap turns less: there is less air left to spin in', () => {
+  const early = onBigJump({ tapAt: 0.05 }).events.find((event) => event.type === 'trick').degrees;
+  const late = onBigJump({ tapAt: bigAir - 0.55 }).events.find((event) => event.type === 'trick');
+  assert.ok(!late || late.degrees < early, `early ${early}, late ${late && late.degrees}`);
+});
+
+test('the spin stops at the landing: the next jump starts square', () => {
+  const skier = createSkier({ x: 0, y: 0.05 });
+  placeOnSurface(skier, gentle, 8, 1);
+  stepSkier(skier, gentle, { jump: true, trick: true }, dt);
+  for (let step = 0; step < 480 && skier.mode === 'air'; step += 1) stepSkier(skier, gentle, {}, dt);
+  assert.equal(skier.mode, 'ground');
+  assert.equal(skier.spinRate, 0);
+  stepSkier(skier, gentle, { jump: true }, dt);
+  for (let step = 0; step < 60; step += 1) stepSkier(skier, gentle, {}, dt);
+  assert.equal(skier.spin, 0, 'a plain pop after a spin does not turn');
 });
 
 test('forward is forgiving, backwards is tight, sideways crashes', () => {
@@ -143,10 +145,9 @@ test('riding switch there are no brakes', () => {
   assert.ok(run(true, false) < run(false, false) * 0.8, 'facing forward the brake works');
 });
 
-test('a switch rider who pops and turns half way round faces forward again', () => {
-  const { skier } = onGentle({ switchStance: true, hold: degrees(160) / tucked });
+test('a switch rider who pops and spins lands safely', () => {
+  const { skier } = onGentle({ switchStance: true, tapAt: 0 });
   assert.equal(skier.crashed, false);
-  assert.equal(skier.switchStance, false);
 });
 
 test('pop chains with spin: one step both leaves the snow and starts turning', () => {
@@ -158,11 +159,72 @@ test('pop chains with spin: one step both leaves the snow and starts turning', (
   assert.ok(skier.spin > 0);
 });
 
-test('letting go slows the turn to the open rate', () => {
-  const skier = createSkier({ x: 0, y: 100 });
-  stepSkier(skier, [], { trick: true }, dt);
-  stepSkier(skier, [], { trick: true }, dt);
-  assert.equal(skier.spinRate, tucked);
-  stepSkier(skier, [], { trick: false }, dt);
-  assert.ok(Math.abs(skier.spinRate - tucked * PHYSICS.openSpinFactor) < 1e-9);
+// ---------------------------------------------------------------- backflip
+
+function flipRide(surfaces, start, speed, pop, tapAt, alsoSpin = false) {
+  const skier = createSkier(start);
+  placeOnSurface(skier, surfaces, speed, 1);
+  const events = [];
+  let takeoff = null;
+  for (let time = 0; time < 20 && !events.some((event) => event.type === 'touchdown'); time += dt) {
+    const airborne = takeoff !== null;
+    const jump = pop && takeoff === null && skier.x > 5;
+    const tap = (airborne && time - takeoff >= tapAt && time - takeoff < tapAt + dt) || (jump && tapAt === 0);
+    for (const event of stepSkier(skier, surfaces, { jump, flip: tap, trick: alsoSpin && tap }, dt)) {
+      events.push(event);
+      if (event.type === 'takeoff' && takeoff === null) takeoff = time;
+    }
+  }
+  return { skier, events, trick: events.find((event) => event.type === 'trick') };
+}
+
+test('one tap of Flip backflips until the landing, as many times as the air allows', () => {
+  const big = flipRide(bigJump, { x: -39, y: 38.7 }, 0, false, 0.05);
+  assert.equal(big.skier.crashed, false, big.events.map((event) => event.kind || event.type).join(','));
+  assert.ok(big.trick && big.trick.flips >= 1, 'at least one backflip on the big jump');
+  const hop = flipRide(gentle, { x: 0, y: 0.05 }, 8, true, 0);
+  assert.equal(hop.skier.crashed, false);
+});
+
+test('a flip tapped at any moment lands upright', () => {
+  for (let tapAt = 0; tapAt < 1.4; tapAt += 0.07) {
+    const attempt = flipRide(bigJump, { x: -39, y: 38.7 }, 0, false, tapAt);
+    assert.equal(attempt.skier.crashed, false, `tap at ${tapAt.toFixed(2)}: ${attempt.events.map((event) => event.kind || event.type).join(',')}`);
+  }
+});
+
+test('flip and spin together: a corked combo lands and scores both', () => {
+  const combo = flipRide(bigJump, { x: -39, y: 38.7 }, 0, false, 0.05, true);
+  assert.equal(combo.skier.crashed, false);
+  assert.ok(combo.trick.flips >= 1 && combo.trick.degrees >= 360, JSON.stringify(combo.trick));
+});
+
+test('landing a flip is judged on being upright', async () => {
+  const { flipOutcome } = await import('../src/physics.js');
+  assert.deepEqual(flipOutcome(0), { clean: true });
+  assert.deepEqual(flipOutcome(2 * Math.PI + PHYSICS.flipCleanAngle / 2), { clean: true });
+  assert.deepEqual(flipOutcome((PHYSICS.flipCleanAngle + PHYSICS.flipSafeAngle) / 2), { clean: false });
+  assert.deepEqual(flipOutcome(Math.PI), { crash: 'flip' });
+});
+
+test('real riders stop a spin a little off: about one in ten crashes, flips never', () => {
+  PHYSICS.spinSpotError = SPOT_ERROR;
+  try {
+    let spinCrashes = 0;
+    let flipCrashes = 0;
+    let jumps = 0;
+    // Different in-run speeds make different takeoffs, so different stops.
+    for (let speed = 0; speed < 12; speed += 0.2) {
+      const spin = ride({ surfaces: bigJump, start: { x: -39, y: 38.7 }, speed, tapAt: 0.05 });
+      const flip = flipRide(bigJump, { x: -39, y: 38.7 }, speed, false, 0.05);
+      jumps += 1;
+      if (spin.skier.crashed) spinCrashes += 1;
+      if (flip.skier.crashed) flipCrashes += 1;
+    }
+    const spinRate = spinCrashes / jumps;
+    assert.ok(spinRate > 0.03 && spinRate < 0.25, `${spinCrashes} of ${jumps} spins crash`);
+    assert.equal(flipCrashes, 0, `${flipCrashes} flips crash`);
+  } finally {
+    PHYSICS.spinSpotError = 0;
+  }
 });

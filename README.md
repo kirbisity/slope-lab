@@ -27,7 +27,8 @@ Works with mouse, keyboard, touch and pen, on phones and desktops.
 | Tuck (less drag) | ↓ or S | hold Tuck |
 | Brake (snowplough) | ← or A | hold Brake |
 | Pop off the snow | Space, ↑ or W | Pop |
-| Spin: pops, then turns while held; the skier lines up before landing | → or D | hold Spin |
+| Spin: a tap pops and turns; momentum carries it, and the skier lines up to land | → or D | Spin |
+| Backflip about the belly, the same way | F | Flip |
 | New Joyride slope | N | New slope |
 | Back to editing | R or Esc | ↺ |
 | Move, sketch, erase, start flag | V, D, E, S | tool bar |

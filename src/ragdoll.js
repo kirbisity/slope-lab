@@ -110,6 +110,7 @@ export function createRagdoll(joints, motion, dt = 1 / 60) {
     spans: MINIMUM_SPANS.map(([a, b, share]) => ({ a, b, minimum: distance(a, b) * share })),
     stillSeconds: 0,
     asleep: false,
+    impacts: [],
   };
 }
 
@@ -135,9 +136,10 @@ function satisfy(ragdoll) {
 // If a joint crossed the snow during this substep, put it back on the
 // surface, stop its motion into the snow and let friction take some of the
 // slide: contact is where tumbling torque comes from.
+// Returns the contact's speed against the snow (m/s), or 0 for no contact.
 function collide(point, start, surfaces) {
   const hit = sweepSurfaces(surfaces, start, point);
-  if (!hit) return false;
+  if (!hit) return 0;
   const a = hit.surface.points[hit.segment];
   const b = hit.surface.points[hit.segment + 1];
   const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
@@ -150,17 +152,20 @@ function collide(point, start, surfaces) {
   const contactY = start.y + (point.y - start.y) * hit.along + ny * RAGDOLL.contactLift;
   const vx = point.x - point.previousX;
   const vy = point.y - point.previousY;
-  const slide = (vx * tx + vy * ty) * (1 - RAGDOLL.contactFriction);
+  const along = vx * tx + vy * ty;
+  const into = Math.max(0, -(vx * nx + vy * ny));
+  const slide = along * (1 - RAGDOLL.contactFriction);
   const lift = Math.max(0, vx * nx + vy * ny);
   point.x = contactX;
   point.y = contactY;
   point.previousX = contactX - (tx * slide + nx * lift);
   point.previousY = contactY - (ty * slide + ny * lift);
-  return true;
+  return { speed: Math.hypot(along, into), x: contactX, y: contactY };
 }
 
 /** Advance the ragdoll by dt seconds over the given surfaces. */
 export function stepRagdoll(ragdoll, surfaces, dt) {
+  ragdoll.impacts = [];
   if (ragdoll.asleep) return;
   const substeps = RAGDOLL.substeps;
   const h = dt / substeps;
@@ -183,7 +188,10 @@ export function stepRagdoll(ragdoll, surfaces, dt) {
     ragdoll.stepSeconds = h;
     satisfy(ragdoll);
     for (const [name, point] of Object.entries(ragdoll.points)) {
-      point.touching = collide(point, starts[name], surfaces) ? RAGDOLL.snowDragSubsteps : Math.max(0, point.touching - 1);
+      const contact = collide(point, starts[name], surfaces);
+      point.touching = contact ? RAGDOLL.snowDragSubsteps : Math.max(0, point.touching - 1);
+      // Contact speed per substep of displacement, in m/s.
+      if (contact) ragdoll.impacts.push({ x: contact.x, y: contact.y, speed: contact.speed / h });
     }
   }
   // Judge stillness by the body's mean joint speed: contact nudges keep a

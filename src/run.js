@@ -24,7 +24,7 @@ export function createRun(course, pieces, surfaces) {
     restSeconds: 0,
     crashSeconds: 0,
     lowestY: Math.min(bounds.minY, course.start.y) - PHYSICS.lostDepthBelowCourse,
-    stats: { maxSpeed: 0, airSeconds: 0, longestAir: 0, maxG: 1, jumps: 0, hardLandings: 0, distance: 0, spins: 0, maxRotation: 0 },
+    stats: { maxSpeed: 0, airSeconds: 0, longestAir: 0, maxG: 1, jumps: 0, hardLandings: 0, distance: 0, spins: 0, maxRotation: 0, flips: 0 },
     trace: [{ x: skier.x, y: skier.y }],
     traceClock: 0,
     grooves: [],
@@ -45,9 +45,10 @@ function recordEvent(run, event) {
   }
   if (event.type === 'crash') run.ouch += SCORING.crashOuch;
   if (event.type === 'trick') {
-    stats.spins += 1;
+    if (event.degrees > 0) stats.spins += 1;
     stats.maxRotation = Math.max(stats.maxRotation, event.degrees);
-    run.joy += SCORING.joyPerHalfTurn * (event.degrees / 180);
+    stats.flips += event.flips;
+    run.joy += SCORING.joyPerHalfTurn * (event.degrees / 180) + SCORING.joyPerFlip * event.flips;
   }
 }
 

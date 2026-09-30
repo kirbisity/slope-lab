@@ -482,6 +482,13 @@ export function skierPose(skier, look) {
   const target = look.brake ? POSES.brake : base;
   const pose = {};
   for (const joint of Object.keys(POSES.upright)) pose[joint] = lerpPoint(target[joint], POSES.tuck[joint], look.tuck);
+  // Flipping: knees pulled up to the chest and the shoulders thrown back,
+  // which is what starts a backflip turning.
+  const flipping = look.flipping || 0;
+  if (flipping > 0) {
+    pose.knee = lerpPoint(pose.knee, [0.3, 0.74], flipping);
+    for (const joint of ['shoulder', 'head', 'hand', 'poleTip']) pose[joint] = rotateAbout(pose[joint], pose.hip, 0.75 * flipping);
+  }
   const body = look.body;
   if (!body) return pose;
   // Knees give under load: toward the compressed stance, or a little past
@@ -502,7 +509,7 @@ function headingOf(skier, look) {
 }
 
 function placedSkeleton(skier, look) {
-  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: headingOf(skier, look) });
+  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: headingOf(skier, look), flip: skier.flip || 0 });
 }
 
 /** The skeleton in the course plane, as a crash ragdoll starts from it. */
@@ -717,8 +724,9 @@ function drawParticles(ctx, camera, particles) {
   for (const particle of particles) {
     const screen = project(camera, particle.x, particle.y, particle.z);
     const life = particle.life / particle.maxLife;
-    ctx.globalAlpha = Math.max(0, Math.min(1, life * 1.4));
-    ctx.fillStyle = '#ffffff';
+    // Cloud puffs are soft and see-through; spray is small and bright.
+    ctx.globalAlpha = particle.puff ? Math.max(0, Math.min(0.55, life * 0.7)) : Math.max(0, Math.min(1, life * 1.4));
+    ctx.fillStyle = particle.puff ? '#f3f8fd' : '#ffffff';
     ctx.beginPath();
     ctx.arc(screen.x, screen.y, Math.max(1, particle.size * screen.scale), 0, Math.PI * 2);
     ctx.fill();

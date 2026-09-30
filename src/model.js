@@ -75,19 +75,29 @@ export function posedJoints(pose) {
   return joints;
 }
 
+// A backflip turns the body about its belly, not its feet.
+const BELLY_HEIGHT = 1.05;
+
 /**
- * Put a body-frame skeleton into the world: tip it by `pitch` about the
- * body's left axis, turn it by `heading` about the vertical, stand it at
- * (x, y). Heading π faces the skier the other way.
+ * Put a body-frame skeleton into the world: roll it backwards by `flip`
+ * about the belly, tip it by `pitch` about the body's left axis, turn it by
+ * `heading` about the vertical, stand it at (x, y). Heading π faces the
+ * skier the other way.
  */
-export function placeJoints(joints, { x, y, pitch, heading }) {
+export function placeJoints(joints, { x, y, pitch, heading, flip = 0 }) {
+  const cosFlip = Math.cos(flip);
+  const sinFlip = Math.sin(flip);
   const cosPitch = Math.cos(pitch);
   const sinPitch = Math.sin(pitch);
   const cosHeading = Math.cos(heading);
   const sinHeading = Math.sin(heading);
   const place = (point, isDirection) => {
-    const px = point.x * cosPitch - point.y * sinPitch;
-    const py = point.x * sinPitch + point.y * cosPitch;
+    // Backwards is anticlockwise in body axes (+x forward, +y up).
+    const bellyY = isDirection ? 0 : BELLY_HEIGHT;
+    const fx = point.x * cosFlip - (point.y - bellyY) * sinFlip;
+    const fy = point.x * sinFlip + (point.y - bellyY) * cosFlip + bellyY;
+    const px = fx * cosPitch - fy * sinPitch;
+    const py = fx * sinPitch + fy * cosPitch;
     const turnedX = px * cosHeading - point.z * sinHeading;
     const turnedZ = px * sinHeading + point.z * cosHeading;
     return isDirection ? { x: turnedX, y: py, z: turnedZ } : { x: x + turnedX, y: y + py, z: turnedZ };

@@ -29,6 +29,13 @@ export const PHYSICS = {
   // from a Joyride cruise (22 m/s on 20°) holds, 25 m/s on 30° does not.
   hockeyCrashSpeed: 30,
   hockeyCrashSlope: 0.7,
+  // With the skis at least this far across, a change of pressure also
+  // catches the edge: the extra load a curve puts on the skis (v²κ, a dip
+  // pressing or a crest lifting) past hockeyLoadTolerance g, or leaving the
+  // snow at all. On Joyride half the ground time is under 0.25 g of curve
+  // load: straight and gently rolling snow is where to stop.
+  hockeyLoadedShare: 0.5,
+  hockeyLoadTolerance: 0.5,
   // A fallen skier slides on jacket and pants, which run on snow nearly as
   // freely as skis do: a crash carries on down a slope.
   crashFriction: 0.3,
@@ -55,11 +62,14 @@ export const PHYSICS = {
   // in between the skis are across the fall line and catch an edge.
   forwardCleanAngle: 0.4,
   forwardSafeAngle: 0.8,
-  switchCleanAngle: 0.2,
-  switchSafeAngle: 0.4,
+  switchCleanAngle: 0.15,
+  switchSafeAngle: 0.3,
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
-  switchMaxAirSeconds: 1.2,
+  switchMaxAirSeconds: 1.0,
+  // Landing backwards, an impact past this crashes (forward it takes
+  // crashLandingSpeed): the tails catch instead of the tips planing up.
+  switchCrashLandingSpeed: 6,
   // Flip tucks the knees and rolls the body backwards about the belly:
   // 7 rad/s is a backflip in ~0.90 s, slower than a spin because the body
   // is long in that direction. Kept fast enough that a flip plus the landing
@@ -80,7 +90,7 @@ export const PHYSICS = {
   // is off by spotError × u^spotErrorShape, u drawn fresh in ±1. A higher
   // shape keeps most stops close; lower makes the line-up weaker. The share
   // of spins that crash is 1 − (safe angle / spinSpotError)^(1/shape): with
-  // shape 3 and 1.1 rad about 10% of forward landings and 29% of the
+  // shape 3 and 1.1 rad about 10% of forward landings and 35% of the
   // tighter switch ones; flips about 25%.
   spotErrorShape: 3,
   spinSpotError: 1.1,

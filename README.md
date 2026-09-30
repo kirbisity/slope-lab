@@ -61,6 +61,7 @@ course is proven solvable.
 | `src/run.js` | One attempt: scoring, goals, how a run ends, stars |
 | `src/courses.js` | Sandbox and challenges with reference solutions |
 | `src/camera.js`, `src/renderer.js` | The 2.5D projection and drawing |
+| `src/backdrop.js` | The 3D mountain range: height field, lit mesh, haze, and the rule for reusing a cached render |
 | `src/input.js`, `src/main.js` | Gestures, keyboard, panels, the game loop |
 | `src/storage.js` | Course files (including old Skateboarding saves), progress |
 | `src/joyride.js` | The random slope generator and its hands-off validation |

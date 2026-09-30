@@ -7,10 +7,12 @@
 
 export const SIZES = [[360, 640], [390, 844], [414, 736], [844, 390], [667, 375], [768, 1024], [1024, 768], [1280, 720], [1440, 900]];
 
-const MUST_FIT = ['.topbar', '.tools', '.ride-bar', '.readout', '.ride-controls .hold-pair', '#brake-button', '#tracks-panel', '.overlay:not([hidden]) .sheet'];
+const MUST_FIT = ['.topbar', '.tools', '.ride-bar', '.readout', '.ride-controls .hold-pair:first-child', '.ride-controls .hold-pair:last-child', '#tracks-panel', '.overlay:not([hidden]) .sheet'];
 const MUST_NOT_OVERLAP = [
-  ['.tools', '.ride-bar'], ['.readout', '.ride-bar'], ['.readout', '.tools'], ['.ride-controls .hold-pair', '.ride-bar'],
-  ['#brake-button', '.ride-bar'], ['#brake-button', '.readout'], ['.ride-controls .hold-pair', '.readout'],
+  ['.tools', '.ride-bar'], ['.readout', '.ride-bar'], ['.readout', '.tools'],
+  ['.ride-controls .hold-pair:last-child', '.ride-bar'], ['.ride-controls .hold-pair:first-child', '.ride-bar'],
+  ['.ride-controls .hold-pair:first-child', '.readout'], ['.ride-controls .hold-pair:last-child', '.readout'],
+  ['.ride-controls .hold-pair:first-child', '.ride-controls .hold-pair:last-child'],
   ['.readout', '.topbar'], ['.tools', '.topbar'], ['#tracks-panel', '.tools'], ['#tracks-panel', '.readout'], ['#tracks-panel', '.topbar'],
 ];
 const MUST_NOT_OVERFLOW = ['.topbar', '.overlay:not([hidden]) .sheet', '.equation-form', '.overlay:not([hidden]) .course-grid', '.overlay:not([hidden]) .help-pages'];
@@ -52,7 +54,13 @@ function checker(frame, width, height, results) {
   };
 }
 
-export async function runLayoutSweep(sizes = SIZES, courseId = 'hidden-curve') {
+export async function runLayoutSweep(sizes = SIZES, courseIds = ['hidden-curve', 'joyride']) {
+  const results = [];
+  for (const courseId of courseIds) results.push(...(await sweepCourse(sizes, courseId)));
+  return { states: results.length, problems: results.filter((result) => result.problems.length).map((result) => `${result.size} ${result.state}: ${result.problems.join('; ')}`) };
+}
+
+async function sweepCourse(sizes, courseId) {
   const results = [];
   for (const [width, height] of sizes) {
     const frame = await openFrame(width, height);
@@ -68,12 +76,12 @@ export async function runLayoutSweep(sizes = SIZES, courseId = 'hidden-curve') {
       doc.querySelector('#courses-overlay [data-close]').click();
       doc.getElementById('help-button').click();
       for (let page = 1; page <= 4; page += 1) { check(`help ${page}`); doc.getElementById('help-next').click(); }
-      lab.startRide(); lab.advance(1); check('ride');
+      lab.startRide(); lab.advance(1); check(`${courseId} ride`);
       lab.advance(20); check('result');
     } catch (error) {
       results.push({ size: `${width}x${height}`, state: 'error', problems: [error.message] });
     }
     frame.remove();
   }
-  return { states: results.length, problems: results.filter((result) => result.problems.length).map((result) => `${result.size} ${result.state}: ${result.problems.join('; ')}`) };
+  return results;
 }

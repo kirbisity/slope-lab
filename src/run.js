@@ -24,7 +24,7 @@ export function createRun(course, pieces, surfaces) {
     restSeconds: 0,
     crashSeconds: 0,
     lowestY: Math.min(bounds.minY, course.start.y) - PHYSICS.lostDepthBelowCourse,
-    stats: { maxSpeed: 0, airSeconds: 0, longestAir: 0, maxG: 1, jumps: 0, hardLandings: 0, distance: 0 },
+    stats: { maxSpeed: 0, airSeconds: 0, longestAir: 0, maxG: 1, jumps: 0, hardLandings: 0, distance: 0, flips: 0 },
     trace: [{ x: skier.x, y: skier.y }],
     traceClock: 0,
     grooves: [],
@@ -44,6 +44,10 @@ function recordEvent(run, event) {
     run.ouch += 1 + Math.round(SCORING.ouchPerImpactSpeed * (event.impact - PHYSICS.softLandingSpeed));
   }
   if (event.type === 'crash') run.ouch += SCORING.crashOuch;
+  if (event.type === 'trick') {
+    stats.flips += event.flips;
+    run.joy += SCORING.flipJoy * event.flips;
+  }
 }
 
 function checkGoals(run, previous, events) {
@@ -150,6 +154,7 @@ function meetsCriterion(criterion, run) {
     case 'minSpeed': return finished && run.stats.maxSpeed >= criterion.value;
     case 'allTokens': return finished && run.collected.size === (run.course.tokens || []).length;
     case 'minScore': return finished && scoreOf(run) >= criterion.value;
+    case 'minFlips': return finished && run.stats.flips >= criterion.value;
     default: return false;
   }
 }
@@ -163,6 +168,7 @@ export function describeCriterion(criterion) {
     case 'minSpeed': return `Top speed ${Math.round(criterion.value * 3.6)} km/h`;
     case 'allTokens': return 'Collect every snowflake';
     case 'minScore': return `Score ${criterion.value}`;
+    case 'minFlips': return criterion.value === 1 ? 'Land a flip' : `Land ${criterion.value} flips`;
     default: return '';
   }
 }

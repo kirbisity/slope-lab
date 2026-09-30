@@ -400,6 +400,12 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
   if (skier.crashed) ctx.rotate(-look.tumble);
   ctx.scale(scale, -scale);
 
+  if (look.spin) {
+    // Somersaults turn about the hips, not the feet.
+    ctx.translate(0, -0.9 * scale);
+    ctx.rotate(-look.spin);
+    ctx.translate(0, 0.9 * scale);
+  }
   const base = skier.mode === 'air' ? POSES.air : POSES.upright;
   const target = look.brake ? POSES.brake : base;
   const pose = {};
@@ -423,27 +429,77 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
     ctx.quadraticCurveTo(0.98 + offsetX, 0.02 + offsetY, 1.02 + offsetX, 0.14 + offsetY);
     ctx.stroke();
   };
-  drawSki(0.06, 0.05, palette.farSki);
+  const geared = !look.lostGear;
+  if (geared) drawSki(0.06, 0.05, palette.farSki);
   line([0.06, 0.12], [pose.knee[0] + 0.05, pose.knee[1] + 0.03], 0.17, palette.farLeg);
   line([pose.knee[0] + 0.05, pose.knee[1] + 0.03], [pose.hip[0] + 0.03, pose.hip[1]], 0.19, palette.farLeg);
-  line(pose.shoulder, [pose.poleTip[0] + 0.05, pose.poleTip[1] + 0.02], 0.025, palette.pole);
+  if (geared) line(pose.shoulder, [pose.poleTip[0] + 0.05, pose.poleTip[1] + 0.02], 0.025, palette.pole);
 
-  drawSki(0, 0, palette.jacket);
+  if (geared) drawSki(0, 0, palette.jacket);
   line([0, 0.12], pose.knee, 0.18, palette.pants);
   line(pose.knee, pose.hip, 0.2, palette.pants);
   ctx.fillStyle = palette.farLeg;
   ctx.fillRect(-0.1, 0.02, 0.24, 0.16);
   line(pose.hip, pose.shoulder, 0.34, palette.jacket);
   line(pose.shoulder, pose.hand, 0.13, palette.sleeve);
-  line(pose.hand, pose.poleTip, 0.03, palette.pole);
+  if (geared) line(pose.hand, pose.poleTip, 0.03, palette.pole);
 
-  ctx.fillStyle = palette.helmet;
-  ctx.beginPath(); ctx.arc(pose.head[0], pose.head[1], 0.14, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = palette.goggles;
-  ctx.beginPath();
-  ctx.ellipse(pose.head[0] + 0.08, pose.head[1] - 0.01, 0.07, 0.045, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (geared) {
+    ctx.fillStyle = palette.helmet;
+    ctx.beginPath(); ctx.arc(pose.head[0], pose.head[1], 0.14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = palette.goggles;
+    ctx.beginPath();
+    ctx.ellipse(pose.head[0] + 0.08, pose.head[1] - 0.01, 0.07, 0.045, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Helmet gone: a bare head with windswept hair.
+    ctx.fillStyle = '#f1c7a3';
+    ctx.beginPath(); ctx.arc(pose.head[0], pose.head[1], 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3b2a20';
+    ctx.beginPath(); ctx.arc(pose.head[0] - 0.02, pose.head[1] + 0.03, 0.12, Math.PI * 0.05, Math.PI * 1.05); ctx.fill();
+  }
   ctx.restore();
+}
+
+function drawGear(ctx, camera, items) {
+  for (const item of items) {
+    const centre = project(camera, item.x, item.y, item.z || 0);
+    const scale = centre.scale;
+    ctx.save();
+    ctx.translate(centre.x, centre.y);
+    ctx.rotate(-item.angle);
+    ctx.scale(scale, -scale);
+    ctx.lineCap = 'round';
+    if (item.kind === 'ski') {
+      const half = item.length / 2;
+      ctx.strokeStyle = COLORS.jacket;
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.moveTo(-half, 0);
+      ctx.lineTo(half - 0.2, 0);
+      ctx.quadraticCurveTo(half, 0, half + 0.03, 0.12);
+      ctx.stroke();
+      ctx.fillStyle = '#1b2433';
+      ctx.fillRect(-0.12, 0, 0.24, 0.06);
+    } else if (item.kind === 'pole') {
+      const half = item.length / 2;
+      ctx.strokeStyle = '#6a7383';
+      ctx.lineWidth = 0.03;
+      ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
+      ctx.strokeStyle = '#1b2433';
+      ctx.lineWidth = 0.02;
+      ctx.beginPath(); ctx.moveTo(-half + 0.1, -0.07); ctx.lineTo(-half + 0.1, 0.07); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#f4f6fa';
+      ctx.beginPath(); ctx.arc(0, 0, 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c8d2e0';
+      ctx.lineWidth = 0.02;
+      ctx.stroke();
+      ctx.fillStyle = '#e8a33a';
+      ctx.beginPath(); ctx.ellipse(0.08, -0.01, 0.07, 0.045, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
 function drawShadow(ctx, camera, surfaces, skier) {
@@ -633,6 +689,7 @@ export function renderScene(ctx, camera, scene) {
     }
     drawSkier(ctx, camera, scene.run.skier, scene.look);
   }
+  if (scene.gear && scene.gear.length) drawGear(ctx, camera, scene.gear);
   drawParticles(ctx, camera, scene.particles);
   if (scene.eraser) {
     ctx.save();

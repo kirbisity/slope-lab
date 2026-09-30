@@ -27,6 +27,7 @@
   <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></symbol>
   <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
   <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></symbol>
   <symbol id="i-mountain" viewBox="0 0 24 24"><path d="M2 20l7-12 4 6 3-4 6 10z"/><path d="M7.3 11l1.7 1.5 1.6-1.4"/></symbol>
@@ -61,6 +62,7 @@
     <button class="tool" data-tool="flag" type="button" aria-pressed="false" title="Move the start (S)" id="flag-tool"><svg class="icon"><use href="#i-flag"/></svg><span>Start</span></button>
     <span class="tool-gap" aria-hidden="true"></span>
     <button class="tool" id="tracks-toggle" type="button" aria-expanded="false" title="Equations (T)"><svg class="icon"><use href="#i-fx"/></svg><span>y = f(x)</span></button>
+    <button class="tool" id="new-slope-button" type="button" title="Generate a new slope (N)" hidden><svg class="icon"><use href="#i-dice"/></svg><span>New slope</span></button>
     <button class="tool" id="fit-button" type="button" title="Fit the course (F)"><svg class="icon"><use href="#i-fit"/></svg><span>Fit</span></button>
     <button class="tool secondary" id="save-button" type="button" title="Save course to a file"><svg class="icon"><use href="#i-save"/></svg><span>Save</span></button>
     <button class="tool secondary" id="load-button" type="button" title="Open a course file"><svg class="icon"><use href="#i-load"/></svg><span>Open</span></button>
@@ -86,7 +88,10 @@
   </section>
 
   <div class="ride-controls" id="ride-controls" hidden>
-    <button class="hold" id="brake-button" type="button" data-control="brake"><strong>Brake</strong><kbd>←</kbd></button>
+    <div class="hold-pair">
+      <button class="hold" id="brake-button" type="button" data-control="brake"><strong>Brake</strong><kbd>←</kbd></button>
+      <button class="hold flip" id="flip-button" type="button" data-control="trick"><strong>Flip</strong><kbd>→</kbd></button>
+    </div>
     <div class="hold-pair">
       <button class="hold" id="tuck-button" type="button" data-control="tuck"><strong>Tuck</strong><kbd>↓</kbd></button>
       <button class="hold jump" id="jump-button" type="button" data-control="jump"><strong>Pop</strong><kbd>Space</kbd></button>
@@ -156,6 +161,7 @@
             <li><kbd>↓</kbd> / <kbd>S</kbd> hold to <b>tuck</b>: less drag, more speed</li>
             <li><kbd>←</kbd> / <kbd>A</kbd> hold to <b>brake</b>: a snowplough, more friction</li>
             <li><kbd>Space</kbd> / <kbd>↑</kbd> to <b>pop</b> off the snow</li>
+            <li><kbd>→</kbd> / <kbd>D</kbd> hold in the air to <b>flip</b>; let go to open up and slow the spin. Land square or crash</li>
             <li><kbd>R</kbd> back to editing, <kbd>P</kbd> pause, <kbd>M</kbd> sound</li>
           </ul>
           <p>On a touchscreen the same three buttons appear at the bottom while you ride. Finish a slope and a ghost of your best run races you next time.</p>
@@ -167,8 +173,8 @@
         </article>
         <article class="help-page" hidden>
           <h3>4 · Scoring</h3>
-          <p><b>Joy</b> grows with speed above walking pace, and faster in the air. <b>Ouch</b> grows with every hard landing or sharp kink. <b>Score</b> = 50 × Joy ÷ (Ouch + 1), so smooth lines beat rough ones.</p>
-          <p>Each challenge has three stars. Some need a clean run, others need you to go faster or fly longer. Challenges limit how many metres of track (<b>ink</b>) you can add.</p>
+          <p><b>Joy</b> grows with speed above walking pace, faster in the air, and +60 for every flip landed. <b>Ouch</b> grows with every hard landing or sharp kink. <b>Score</b> = 50 × Joy ÷ (Ouch + 1), so smooth lines beat rough ones.</p>
+          <p>Start with <b>Joyride</b>, a new random slope each time with no maths needed. Each slope has three stars. Some need a clean run, others need you to go faster or fly longer. Challenges limit how many metres of track (<b>ink</b>) you can add.</p>
         </article>
       </div>
       <div class="pager">
@@ -188,6 +194,7 @@
       <div class="result-actions">
         <button type="button" id="result-edit">Edit track</button>
         <button type="button" id="result-again">Ride again</button>
+        <button type="button" id="result-new" hidden>New slope</button>
         <button type="button" class="primary" id="result-next" hidden>Next slope</button>
       </div>
     </div>

@@ -189,3 +189,27 @@ test('the ragdoll reports where and how hard it hits the snow, and goes quiet at
   stepRagdoll(ragdoll, flat, 1 / 60);
   assert.deepEqual(ragdoll.impacts, []);
 });
+
+test('a crashed body keeps going on steep ground and stops on gentle ground', async () => {
+  const { RAGDOLL } = await import('../src/config.js');
+  // Coulomb friction: sliding keeps accelerating where the slope beats atan(μ).
+  const steepSlope = Math.tan(Math.atan(RAGDOLL.contactFriction) + 0.35);
+  const gentleSlope = Math.tan(Math.atan(RAGDOLL.contactFriction) - 0.2);
+  const ride = (gradient) => {
+    const slope = buildSurfaces([createEquationPiece(`y = -${gradient.toFixed(4)}x`, -10, 385)]);
+    const ragdoll = standing(0, 0.05, 8, -4, -5);
+    // A tumbling body's instant speed swings wildly; compare average speeds
+    // over two windows, from the distance its hips covered.
+    const hipAt = [];
+    for (let frame = 0; frame <= 60 * 10; frame += 1) {
+      hipAt.push({ x: ragdoll.points.hip.x, y: ragdoll.points.hip.y });
+      stepRagdoll(ragdoll, slope, 1 / 60);
+    }
+    const average = (from, to) => Math.hypot(hipAt[to * 60].x - hipAt[from * 60].x, hipAt[to * 60].y - hipAt[from * 60].y) / (to - from);
+    return { early: average(1, 3), late: average(8, 10), asleep: ragdoll.asleep };
+  };
+  const steep = ride(steepSlope);
+  assert.ok(steep.late > steep.early && steep.late > 8, `steep: ${steep.early.toFixed(1)} → ${steep.late.toFixed(1)} m/s`);
+  const gentle = ride(gentleSlope);
+  assert.ok(gentle.late < 1, `gentle: still ${gentle.late.toFixed(1)} m/s`);
+});

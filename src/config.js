@@ -29,12 +29,12 @@ export const PHYSICS = {
   // clear a roller or add height at a lip.
   jumpImpulse: 4,
   // Holding Spin wraps the arms in and turns the body about the vertical
-  // axis: 12 rad/s is a 360 in ~0.52 s. Letting go opens the arms and the
+  // axis: 9 rad/s is a 360 in ~0.70 s. Letting go opens the arms and the
   // rider spots the landing: the turn carries on at the open rate (a fifth,
   // as angular momentum demands) until the body faces straight down the
   // hill or straight back, then holds there. A release crashes only if the
   // air runs out before that heading comes round.
-  spinRateTucked: 12,
+  spinRateTucked: 9,
   openSpinFactor: 0.2,
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), less;
@@ -47,10 +47,10 @@ export const PHYSICS = {
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
   // Flip tucks the knees and rolls the body backwards about the belly:
-  // 7.5 rad/s is a backflip in ~0.84 s, slower than a spin because the body
+  // 7 rad/s is a backflip in ~0.90 s, slower than a spin because the body
   // is long in that direction. Kept fast enough that a flip plus the landing
   // spare fits Joyride's shortest jumps (1 s of air).
-  flipRateTucked: 7.5,
+  flipRateTucked: 7,
   // Off upright at touchdown: past the first a sketchy landing, past the
   // second the skier lands on their back.
   flipCleanAngle: 0.3,
@@ -131,18 +131,21 @@ export const BODY = {
 export const RAGDOLL = {
   substeps: 4,
   constraintPasses: 6,
-  airDamping: 0.999,
-  // Share of the slide the snow takes per contact substep. Grip is what
-  // turns a slide into a roll: with little snow drag (below) a crashed body
-  // tumbles ~8 rad and 11 m down a 24° slope in 5 s. Less grip than this
-  // and it only slides, no longer rolling over on steep ground.
-  contactFriction: 0.35,
-  // Contact margin keeps joints just clear of the surface they touch.
+  // Losses are per second, not per substep: a per-substep share compounds
+  // 240 times a second and stalled a body even on a 35° slope.
+  airDragPerSecond: 0.05,
+  // Coulomb friction between a tumbling body and snow: a contact takes at
+  // most μ times the speed pushed into the snow off the slide. Each thump of a
+  // roll also loses the speed pushed into the snow, so a tumbling body only
+  // keeps gaining speed on ground steeper than about 29° (measured), and slows
+  // to a stop below about 20°. Hard contacts push more, so they grip more,
+  // which is what makes the body roll.
+  contactFriction: 0.3,
   contactLift: 0.005,
-  // Joints that touched snow in the last few substeps are dragged by it
-  // (velocity kept per substep), which ends slow creep and buzzing contacts.
+  // Joints that touched snow in the last few substeps are dragged by it a
+  // little (per second), which ends buzzing contacts on flat ground.
   snowDragSubsteps: 4,
-  snowDrag: 0.985,
+  snowDragPerSecond: 0.4,
   // Nearly still for this long and the body sleeps: it stops simulating.
   sleepSpeed: 0.45,
   sleepSeconds: 0.5,

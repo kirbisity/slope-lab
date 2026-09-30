@@ -13,6 +13,8 @@ import { createRecorder, recordSample, ghostPose, beatsGhost, ghostFromRun, isGh
 import { createAudio, unlock, setMuted, updateAmbience, playLanding, playCrash, playChime } from './audio.js';
 import { generateJoyride, randomSeed, JOYRIDE_ID, JOYRIDE_VERSION } from './joyride.js';
 import { throwGear, stepAllGear } from './debris.js';
+import { createBodyDynamics, updateBodyDynamics, createRagdoll, stepRagdoll, ragdollCentre, feltAcceleration } from './ragdoll.js';
+import { skierJointsInWorld } from './renderer.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -41,6 +43,10 @@ const state = {
   touch: { tuck: false, brake: false, trick: false },
   gear: [],
   slowMotionSeconds: 0,
+  body: createBodyDynamics(),
+  ragdoll: null,
+  pendingImpact: 0,
+  lastSpeed: 0,
   jumpBufferSeconds: 0,
   look: { tuck: 0, pitch: 0, tumble: 0, brake: false },
   particles: [],
@@ -218,6 +224,10 @@ function startRide() {
   state.shake = 0;
   state.gear = [];
   state.slowMotionSeconds = 0;
+  state.body = createBodyDynamics();
+  state.ragdoll = null;
+  state.pendingImpact = 0;
+  state.lastSpeed = 0;
   state.run = createRun(state.course, state.pieces, state.surfaces);
   state.mode = 'ride';
   state.paused = false;
@@ -243,6 +253,7 @@ function backToEdit() {
   state.particles = [];
   state.gear = [];
   state.slowMotionSeconds = 0;
+  state.ragdoll = null;
   document.body.classList.remove('riding');
   document.body.classList.add('editing');
   $('ride-controls').hidden = true;
@@ -299,12 +310,21 @@ const CRASH_MESSAGES = {
   'switch-big-air': 'Too much air to land backwards',
 };
 
+// The body goes limp where it stands: the ragdoll takes the pose on screen,
+// the skier's speed, and a forward tumble that grows with speed.
+function startRagdoll(skier) {
+  const speed = speedOf(skier);
+  const tumble = -skier.facing * Math.min(10, Math.max(3, speed * 0.35));
+  state.ragdoll = createRagdoll(skierJointsInWorld(skier, state.look), { vx: skier.vx, vy: skier.vy, spin: tumble });
+}
+
 function handleRunEvent(event) {
   const run = state.run;
   switch (event.type) {
     case 'touchdown':
       spray(event.x, event.y, Math.min(40, 6 + event.impact * 4), 2 + event.impact * 0.6);
       playLanding(state.audio, event.impact);
+      state.pendingImpact = Math.max(state.pendingImpact, event.impact);
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * Math.max(0, event.impact - PHYSICS.softLandingSpeed));
       if (event.airSeconds > 0.7 && event.impact <= PHYSICS.softLandingSpeed && !run.skier.crashed) {
         toast(`Clean landing · ${event.airSeconds.toFixed(1)} s air`, 'good');
@@ -321,6 +341,7 @@ function handleRunEvent(event) {
       spray(event.x, event.y, 60, 6);
       state.gear = throwGear(run.skier);
       state.slowMotionSeconds = CRASH_SLOW_MOTION_SECONDS;
+      startRagdoll(run.skier);
       playCrash(state.audio);
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * event.impact);
       break;
@@ -430,7 +451,8 @@ function fitView() {
 }
 
 function followSkier(dt) {
-  const skier = state.run.skier;
+  // After a crash the camera follows the tumbling body, not the sliding point.
+  const skier = state.ragdoll ? { ...state.run.skier, ...ragdollCentre(state.ragdoll), vx: 0, vy: 0 } : state.run.skier;
   if (performance.now() < state.followPausedUntil) return;
   const camera = state.camera;
   const speed = speedOf(skier);
@@ -477,6 +499,8 @@ function tick(dt) {
     if (!state.paused) {
       physicsFrame(worldDt);
       if (state.gear.length) state.gear = stepAllGear(state.gear, state.run.surfaces, worldDt, state.run.lowestY);
+      if (state.ragdoll) stepRagdoll(state.ragdoll, state.run.surfaces, worldDt);
+      else updateBody(worldDt);
     }
     updateLook(dt);
     followSkier(dt);
@@ -501,6 +525,23 @@ function advance(seconds) {
   return state.run ? { status: state.run.status, time: state.run.time, x: state.run.skier.x, y: state.run.skier.y } : null;
 }
 
+// Feed this frame's loads to the body: normal load in g, the acceleration
+// the body feels along the way, and any landing since the last frame.
+function updateBody(dt) {
+  if (dt <= 0) return;
+  const skier = state.run.skier;
+  const speed = speedOf(skier);
+  const airborne = skier.mode === 'air';
+  updateBodyDynamics(state.body, {
+    gForce: airborne ? 0 : skier.normalAccel / PHYSICS.gravity,
+    tangentialAccel: feltAcceleration(skier, state.lastSpeed, dt),
+    airborne,
+    impact: state.pendingImpact,
+  }, dt);
+  state.lastSpeed = speed;
+  state.pendingImpact = 0;
+}
+
 function updateLook(dt) {
   const run = state.run;
   const controls = currentControls();
@@ -509,6 +550,7 @@ function updateLook(dt) {
   // Heading about the vertical axis: half a turn when riding backwards.
   look.yaw = (run.skier.switchStance ? Math.PI : 0) + run.skier.spin;
   look.lostGear = run.skier.crashed;
+  look.body = state.body;
   look.brake = controls.brake && run.skier.mode === 'ground' && !run.skier.switchStance;
   const difference = Math.atan2(Math.sin(run.skier.pitch - look.pitch), Math.cos(run.skier.pitch - look.pitch));
   look.pitch += difference * Math.min(1, dt * 18);
@@ -539,6 +581,7 @@ function draw() {
     course: { ...state.course, start: state.start },
     collected: run ? run.collected : null,
     run,
+    ragdoll: state.ragdoll,
     look: state.look,
     prediction,
     ghost,

@@ -38,10 +38,10 @@ export const PHYSICS = {
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), less;
   // in between the skis are across the fall line and catch an edge.
-  forwardCleanAngle: 0.45,
-  forwardSafeAngle: 0.9,
-  switchCleanAngle: 0.25,
-  switchSafeAngle: 0.5,
+  forwardCleanAngle: 0.6,
+  forwardSafeAngle: 1.2,
+  switchCleanAngle: 0.35,
+  switchSafeAngle: 0.7,
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,

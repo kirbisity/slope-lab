@@ -461,7 +461,7 @@ const POSES = {
   brake: { knee: [0.26, 0.5], hip: [-0.14, 0.88], shoulder: [-0.02, 1.4], head: [0.04, 1.6], hand: [0.36, 1.02], poleTip: [-0.3, 0.03] },
   air: { knee: [0.3, 0.55], hip: [-0.02, 0.9], shoulder: [0.24, 1.38], head: [0.32, 1.57], hand: [0.62, 1.22], poleTip: [-0.25, 0.6] },
   // Knees and hips taking a heavy load: what a hard compression looks like.
-  compressed: { knee: [0.42, 0.34], hip: [-0.2, 0.52], shoulder: [0.22, 0.96], head: [0.3, 1.14], hand: [0.52, 0.66], poleTip: [-0.5, 0.05] },
+  compressed: { knee: [0.5, 0.3], hip: [-0.26, 0.42], shoulder: [0.2, 0.86], head: [0.28, 1.04], hand: [0.52, 0.58], poleTip: [-0.5, 0.05] },
 };
 
 function rotateAbout(point, centre, angle) {

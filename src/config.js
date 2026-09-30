@@ -28,12 +28,13 @@ export const PHYSICS = {
   // clear a roller or add height at a lip.
   jumpImpulse: 4,
   // Holding Spin wraps the arms in and turns the body about the vertical
-  // axis: 9 rad/s is a 360 in ~0.7 s. Letting go opens the arms, which
-  // multiplies the moment of inertia about five times, so the same angular
-  // momentum turns five times slower: the rider steers the rotation the
-  // way figure skaters do.
-  spinRateTucked: 9,
-  openSpinFactor: 0.2,
+  // axis: 13 rad/s is a 360 in ~0.48 s. Letting go opens the arms, which
+  // multiplies the moment of inertia about seven times, so the same angular
+  // momentum turns seven times slower (~1.8 rad/s): the rider steers the
+  // rotation the way figure skaters do. The two move together: the open
+  // rate decides how much a quick tap on a small pop carries past 90°.
+  spinRateTucked: 13,
+  openSpinFactor: 0.14,
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), little;
   // in between the skis are across the fall line and catch an edge.
@@ -83,11 +84,11 @@ export const BODY = {
   // Knees and hips: rest crouch on flat snow, extra crouch per g above 1,
   // and how hard a landing (m/s into the snow) kicks them down.
   standingCrouch: 0.22,
-  crouchPerG: 0.3,
+  crouchPerG: 0.6,
   airCrouch: 0.05,
   crouchFrequency: 12,
-  crouchDamping: 0.35,
-  impactKick: 0.14,
+  crouchDamping: 0.3,
+  impactKick: 0.2,
   // Torso lean (rad) per g of slowing down; forward when braking.
   leanPerG: 0.9,
   leanFrequency: 8,

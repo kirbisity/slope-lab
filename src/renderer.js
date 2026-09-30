@@ -459,7 +459,8 @@ function lerpPoint(a, b, t) {
 const POSES = {
   upright: { knee: [0.2, 0.52], hip: [-0.02, 0.95], shoulder: [0.14, 1.46], head: [0.2, 1.66], hand: [0.5, 1.0], poleTip: [-0.4, 0.03] },
   tuck: { knee: [0.4, 0.4], hip: [-0.1, 0.6], shoulder: [0.42, 0.98], head: [0.62, 1.1], hand: [0.72, 0.72], poleTip: [-0.55, 0.95] },
-  brake: { knee: [0.26, 0.5], hip: [-0.14, 0.88], shoulder: [-0.02, 1.4], head: [0.04, 1.6], hand: [0.36, 1.02], poleTip: [-0.3, 0.03] },
+  // Hockey stop: sunk low on bent knees, hands forward for balance.
+  hockey: { knee: [0.36, 0.4], hip: [-0.1, 0.64], shoulder: [0.1, 1.16], head: [0.16, 1.36], hand: [0.5, 0.86], poleTip: [-0.1, 0.03] },
   air: { knee: [0.3, 0.55], hip: [-0.02, 0.9], shoulder: [0.24, 1.38], head: [0.32, 1.57], hand: [0.62, 1.22], poleTip: [-0.25, 0.6] },
   // Knees and hips taking a heavy load: what a hard compression looks like.
   compressed: { knee: [0.5, 0.3], hip: [-0.26, 0.42], shoulder: [0.2, 0.86], head: [0.28, 1.04], hand: [0.52, 0.58], poleTip: [-0.5, 0.05] },
@@ -479,9 +480,9 @@ function rotateAbout(point, centre, angle) {
  */
 export function skierPose(skier, look) {
   const base = skier.mode === 'air' ? POSES.air : POSES.upright;
-  const target = look.brake ? POSES.brake : base;
+  const hockey = look.hockey || 0;
   const pose = {};
-  for (const joint of Object.keys(POSES.upright)) pose[joint] = lerpPoint(target[joint], POSES.tuck[joint], look.tuck);
+  for (const joint of Object.keys(POSES.upright)) pose[joint] = lerpPoint(lerpPoint(base[joint], POSES.hockey[joint], hockey), POSES.tuck[joint], look.tuck);
   // Flipping: knees pulled up to the chest and the shoulders thrown back,
   // which is what starts a backflip turning.
   const flipping = look.flipping || 0;
@@ -503,8 +504,23 @@ export function skierPose(skier, look) {
   return pose;
 }
 
+// A hockey stop swings the skis right across the way of travel while the
+// upper body keeps facing partly down the hill, and the whole rider leans
+// back up the slope onto the edges (about the feet, so the skis tilt on edge).
+const HOCKEY_SKI_TURN = Math.PI / 2;
+const HOCKEY_UPPER_TURN = Math.PI / 5;
+const HOCKEY_EDGE_LEAN = 0.35;
+const UPPER_BODY = ['head', 'shoulderL', 'shoulderR', 'elbowL', 'elbowR', 'handL', 'handR', 'poleTipL', 'poleTipR'];
+
 function placedSkeleton(skier, look) {
-  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: look.yaw || 0, flip: skier.flip || 0, facing: skier.facing < 0 ? -1 : 1 });
+  const hockey = look.hockey || 0;
+  const joints = posedJoints(skierPose(skier, look));
+  const placement = { x: skier.x, y: skier.y, pitch: look.pitch + hockey * HOCKEY_EDGE_LEAN, flip: skier.flip || 0, facing: skier.facing < 0 ? -1 : 1 };
+  const placed = placeJoints(joints, { ...placement, heading: (look.yaw || 0) + hockey * HOCKEY_SKI_TURN });
+  if (hockey === 0) return placed;
+  const upper = placeJoints(joints, { ...placement, heading: (look.yaw || 0) + hockey * HOCKEY_UPPER_TURN });
+  for (const name of UPPER_BODY) placed[name] = upper[name];
+  return placed;
 }
 
 /** The skeleton in the course plane, as a crash ragdoll starts from it. */
@@ -783,7 +799,7 @@ export function renderScene(ctx, camera, scene) {
     if (scene.prediction) drawPrediction(ctx, camera, scene.prediction);
     if (scene.ghost) {
       const ghostSkier = { ...scene.ghost, mode: 'air', crashed: false };
-      drawSkier(ctx, camera, ghostSkier, { tuck: 0.4, pitch: scene.ghost.pitch, tumble: 0, brake: false }, GHOST_MODEL_PALETTE, 0.5);
+      drawSkier(ctx, camera, ghostSkier, { tuck: 0.4, pitch: scene.ghost.pitch, tumble: 0, hockey: 0 }, GHOST_MODEL_PALETTE, 0.5);
       const tag = project(camera, scene.ghost.x, scene.ghost.y + 1.9, 0);
       ctx.save();
       ctx.globalAlpha = 0.8;

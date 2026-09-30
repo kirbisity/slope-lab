@@ -137,6 +137,9 @@ test('gravity is not felt: sliding freely feels like nothing, braking feels like
     const skier = createSkier({ x: 0, y: 0.05 });
     placeOnSurface(skier, slope, 10, 1);
     const dt = 1 / 60;
+    // Let a hockey stop swing the skis across before feeling it.
+    const settle = Math.ceil(PHYSICS.hockeyTurnSeconds / PHYSICS.stepSeconds);
+    for (let step = 0; step < settle; step += 1) stepSkier(skier, slope, controls, PHYSICS.stepSeconds);
     let previous = Math.hypot(skier.vx, skier.vy);
     for (let step = 0; step < 4; step += 1) stepSkier(skier, slope, controls, PHYSICS.stepSeconds);
     const felt = feltAcceleration(skier, previous, 4 * PHYSICS.stepSeconds);

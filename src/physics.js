@@ -34,6 +34,7 @@ export function createSkier(start) {
     flipRate: 0,
     flipping: false,
     flipArmed: false,
+    hockey: 0,
     flipForced: false,
     flipGoal: 0,
     switchStance: false,
@@ -49,11 +50,24 @@ export function dragCoefficient(controls) {
   return (0.5 * PHYSICS.airDensity * area) / PHYSICS.massKg;
 }
 
-function frictionCoefficient(skier, controls) {
+function frictionCoefficient(skier) {
   if (skier.crashed) return PHYSICS.crashFriction;
-  // A snowplough needs the ski tips together in front: riding switch there
-  // is no way to brake.
-  return controls.brake && !skier.switchStance ? PHYSICS.brakeFriction : PHYSICS.snowFriction;
+  return PHYSICS.snowFriction + (PHYSICS.hockeyGrip - PHYSICS.snowFriction) * skier.hockey;
+}
+
+/**
+ * Swing the skis toward across the way of travel while braking, or back
+ * along it. Riding switch there is no hockey stop.
+ */
+function turnForHockeyStop(skier, controls, dt) {
+  const braking = controls.brake && !skier.switchStance && !skier.crashed;
+  const turn = dt / PHYSICS.hockeyTurnSeconds;
+  skier.hockey = braking ? Math.min(1, skier.hockey + turn) : Math.max(0, skier.hockey - turn);
+}
+
+/** How close a full hockey stop is to catching an edge: past 1 it does. */
+export function hockeyStopLoad(speed, slope) {
+  return (speed / PHYSICS.hockeyCrashSpeed) ** 2 + (Math.max(0, slope) / PHYSICS.hockeyCrashSlope) ** 2;
 }
 
 function segmentGeometry(surface, index) {
@@ -94,6 +108,7 @@ function launch(skier, segment, events, reason) {
   const nx = -segment.ty * skier.side;
   const ny = segment.tx * skier.side;
   skier.mode = 'air';
+  skier.hockey = 0;
   skier.vx = segment.tx * skier.speed;
   skier.vy = segment.ty * skier.speed;
   // Lift clear of the surface just left so the next sweep cannot re-hit it.
@@ -240,9 +255,16 @@ function stepGround(skier, surfaces, controls, dt, events) {
     return;
   }
 
+  turnForHockeyStop(skier, controls, dt);
+  if (skier.hockey >= 1 && hockeyStopLoad(Math.abs(skier.speed), -skier.pitch) > 1) {
+    skier.crashed = true;
+    events.push({ type: 'crash', impact: 0, kind: 'edge', x: skier.x, y: skier.y });
+  }
+
   const gravityAlong = -g * segment.ty;
   let speed = skier.speed + gravityAlong * dt;
-  const resistance = (frictionCoefficient(skier, controls) * normalAccel + dragCoefficient(controls) * speed * speed) * dt;
+  const spray = PHYSICS.hockeySprayDrag * skier.hockey * Math.abs(speed);
+  const resistance = (frictionCoefficient(skier) * normalAccel + spray + dragCoefficient(controls) * speed * speed) * dt;
   // Friction and drag oppose motion but never reverse it on their own.
   speed = Math.abs(speed) <= resistance ? 0 : speed - Math.sign(speed) * resistance;
   skier.speed = speed;

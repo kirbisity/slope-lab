@@ -69,21 +69,33 @@ test('letting go past halfway completes the turn: a clean 360', () => {
   assert.equal(skier.crashed, false);
 });
 
-test('letting go before halfway unwinds to straight: no crash, even on a hop', () => {
-  for (const attempt of [onGentle({ hold: degrees(100) / tucked }), onBigJump({ hold: degrees(120) / tucked })]) {
-    assert.equal(attempt.skier.crashed, false);
-    assert.ok(!attempt.events.some((event) => event.type === 'trick'));
-  }
+test('letting go early lines up with the nearest safe heading', () => {
+  // A big jump is too much air to land backwards, so an early let-go unwinds.
+  const big = onBigJump({ hold: degrees(120) / tucked });
+  assert.equal(big.skier.crashed, false);
+  assert.ok(!big.events.some((event) => event.type === 'trick'));
+  assert.equal(big.skier.switchStance, false);
+  // On a hop, straight back is a safe landing too, and it may be the nearer one.
+  const hop = onGentle({ hold: degrees(100) / tucked });
+  assert.equal(hop.skier.crashed, false);
 });
 
-test('letting go too late for the turn to finish still crashes', () => {
-  // Released a quarter turn short of a heading with too little air left to reach it.
-  const openRate = tucked * PHYSICS.openSpinFactor;
-  let crashed = false;
-  for (let hold = bigAir - 0.3; hold < bigAir && !crashed; hold += 0.01) {
-    crashed = onBigJump({ hold }).skier.crashed;
+test('holding Spin right through a jump still lands: the rider lines up in time', () => {
+  for (const attempt of [onBigJump({ hold: Infinity }), onGentle({ hold: Infinity })]) {
+    assert.equal(attempt.skier.crashed, false, attempt.events.map((event) => event.kind || event.type).join(','));
   }
-  assert.ok(crashed, `some late release crashes (open rate ${openRate.toFixed(1)} rad/s)`);
+  const big = onBigJump({ hold: Infinity });
+  // Holding keeps the full turn rate until the last heading the air allows,
+  // so a long hold on a big jump lands more than a single turn.
+  assert.ok(big.events.find((event) => event.type === 'trick').degrees >= 720, 'a long hold on a big jump lands several turns');
+});
+
+test('any hold, released or not, lands on the big jump and the hop', () => {
+  for (let hold = 0.02; hold < 2; hold += 0.06) {
+    for (const attempt of [onBigJump({ hold }), onGentle({ hold })]) {
+      assert.equal(attempt.skier.crashed, false, `hold ${hold.toFixed(2)} s crashed: ${attempt.events.map((event) => event.kind || event.type).join(',')}`);
+    }
+  }
 });
 
 test('spinning is forgiving: most releases made in the air land', () => {
@@ -131,8 +143,8 @@ test('riding switch there are no brakes', () => {
   assert.ok(run(true, false) < run(false, false) * 0.8, 'facing forward the brake works');
 });
 
-test('a switch rider who pops and lets go turns to face forward again', () => {
-  const { skier } = onGentle({ switchStance: true, hold: 0.05 });
+test('a switch rider who pops and turns half way round faces forward again', () => {
+  const { skier } = onGentle({ switchStance: true, hold: degrees(160) / tucked });
   assert.equal(skier.crashed, false);
   assert.equal(skier.switchStance, false);
 });

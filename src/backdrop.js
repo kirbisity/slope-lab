@@ -46,17 +46,24 @@ function valueNoise(x, y) {
   return top + (bottom - top) * fy;
 }
 
-/** Ridged noise: creases where the noise crosses its middle become ridgelines. */
+/**
+ * Ridged noise with its creases rounded: where the noise crosses its middle
+ * it makes a ridgeline, but |x| is blended into a smooth curve there so the
+ * crest is a rounded shoulder rather than a knife edge. Each octave adds
+ * less than the last, so fine detail leans on the broad shape.
+ */
 function ridged(x, y) {
   let total = 0;
   let amplitude = 1;
   let frequency = 1;
   let norm = 0;
   for (let octave = 0; octave < BACKDROP.noiseOctaves; octave += 1) {
-    const ridge = 1 - Math.abs(2 * valueNoise(x * frequency, y * frequency) - 1);
-    total += ridge * ridge * amplitude;
+    const centred = 2 * valueNoise(x * frequency, y * frequency) - 1;
+    // Rescaled so a rounded crest still reaches 1.
+    const ridge = Math.max(0, (1 - Math.sqrt(centred * centred + BACKDROP.ridgeRounding)) / (1 - Math.sqrt(BACKDROP.ridgeRounding)));
+    total += ridge ** BACKDROP.ridgePower * amplitude;
     norm += amplitude;
-    amplitude *= 0.5;
+    amplitude *= BACKDROP.octaveDecay;
     frequency *= 2.1;
   }
   return total / norm;
@@ -67,10 +74,10 @@ export function heightAt(x, depth) {
   const span = BACKDROP.farDepth - BACKDROP.nearDepth;
   const back = Math.min(1, Math.max(0, (depth - BACKDROP.nearDepth) / span));
   const envelope = BACKDROP.foothillShare + (1 - BACKDROP.foothillShare) * smooth(Math.min(1, back * 1.6));
-  const shape = ridged(x / 420, depth / 420);
+  const shape = ridged(x / BACKDROP.featureSize, depth / BACKDROP.featureSize);
   // In front of the main range the land flattens toward the camera.
   const foreground = Math.min(1, depth / BACKDROP.nearDepth) ** 2;
-  return Math.max(0, BACKDROP.peakHeight * envelope * (shape * 1.35 - 0.2)) * foreground;
+  return Math.max(0, BACKDROP.peakHeight * envelope * (shape * BACKDROP.shapeGain - BACKDROP.shapeLift)) * foreground;
 }
 
 /** The backdrop camera for this frame, derived from the course camera. */
@@ -112,10 +119,26 @@ function toRgb(colour) {
   return `rgb(${Math.round(colour[0])},${Math.round(colour[1])},${Math.round(colour[2])})`;
 }
 
-function materialFor(height, slope) {
-  if (height > BACKDROP.snowLine && slope < BACKDROP.snowMaxSlope) return 'snow';
-  if (height < BACKDROP.treeLine) return 'forest';
-  return 'rock';
+function ramp(value, from, to) {
+  return smooth(Math.min(1, Math.max(0, (value - from) / (to - from))));
+}
+
+/**
+ * How much of each material covers ground at this height and steepness.
+ * The bands blend into one another over materialBlendMetres, so snow fades
+ * into rock and rock into forest instead of changing colour triangle by
+ * triangle, which drew the boundary as a sawtooth.
+ */
+function materialMix(height, slope) {
+  const blend = BACKDROP.materialBlendMetres;
+  const steep = 1 - ramp(slope, BACKDROP.snowMaxSlope * 0.7, BACKDROP.snowMaxSlope * 1.3);
+  const snow = ramp(height, BACKDROP.snowLine - blend, BACKDROP.snowLine + blend) * steep;
+  const forest = (1 - ramp(height, BACKDROP.treeLine - blend / 2, BACKDROP.treeLine + blend / 2)) * (1 - snow);
+  return { snow, forest, rock: Math.max(0, 1 - snow - forest) };
+}
+
+function dominant(weights) {
+  return Object.keys(weights).reduce((best, name) => (weights[name] > weights[best] ? name : best), 'rock');
 }
 
 function shadeTriangle(a, b, c, depth) {
@@ -129,8 +152,13 @@ function shadeTriangle(a, b, c, depth) {
   const light = Math.round((AMBIENT + (1 - AMBIENT) * lambert) * LIGHT_BANDS) / LIGHT_BANDS;
   const height = (a.height + b.height + c.height) / 3;
   const slope = Math.sqrt(1 - normal.y * normal.y) / Math.max(0.05, normal.y);
-  const material = materialFor(height, slope);
-  const base = mix(MATERIALS[material].shadow, MATERIALS[material].lit, Math.min(1, light));
+  const weights = materialMix(height, slope);
+  const material = dominant(weights);
+  let base = [0, 0, 0];
+  for (const name of Object.keys(weights)) {
+    const colour = mix(MATERIALS[name].shadow, MATERIALS[name].lit, Math.min(1, light));
+    base = [base[0] + colour[0] * weights[name], base[1] + colour[1] * weights[name], base[2] + colour[2] * weights[name]];
+  }
   const back = Math.max(0, (depth - BACKDROP.nearDepth) / (BACKDROP.farDepth - BACKDROP.nearDepth));
   const haze = BACKDROP.nearHaze + (BACKDROP.farHaze - BACKDROP.nearHaze) * back;
   return { fill: toRgb(mix(base, HAZE, haze)), material, haze, height };

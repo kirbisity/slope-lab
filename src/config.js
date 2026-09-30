@@ -246,6 +246,16 @@ export const BACKDROP = {
   columnSpacing: 12,
   // Finer ridged noise on top of the broad shape: more facets on each slope.
   noiseOctaves: 5,
+  // Smoothness: the ridge crease is rounded by this much (0 is a knife
+  // edge) and each finer octave adds this share of the one before.
+  ridgeRounding: 0.15,
+  octaveDecay: 0.3,
+  // A ridge's profile: power 2 is peaky, nearer 1 is broad. Features are
+  // featureSize metres across; height = gain × shape − lift.
+  ridgePower: 1.4,
+  featureSize: 560,
+  shapeGain: 1.35,
+  shapeLift: 0.45,
   // The land keeps coming toward the camera under the course: extra rows
   // from foregroundDepth out to nearDepth, flattening to low ground the
   // closer they are so they never tower over the course. Close rows project
@@ -254,7 +264,7 @@ export const BACKDROP = {
   foregroundDepth: 70,
   // A safety skirt below the nearest row, this many pixels past the screen.
   skirtPixelsBelow: 240,
-  peakHeight: 230,
+  peakHeight: 255,
   // The nearest row keeps to foothills this share of the peaks, rising to
   // full height by the back of the range.
   foothillShare: 0.28,
@@ -267,6 +277,8 @@ export const BACKDROP = {
   verticalParallax: 0.35,
   snowLine: 105,
   treeLine: 42,
+  // Snow fades into rock, and rock into forest, over about this many metres.
+  materialBlendMetres: 26,
   // Steeper than this, snow will not stay: bare rock shows.
   snowMaxSlope: 1.1,
   // Share of the way to the sky colour at the farthest row.

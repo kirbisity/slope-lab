@@ -121,3 +121,44 @@ test('the range is a finely faceted mesh: well over the old 1,600 triangles', ()
   const { triangles } = buildBackdrop(createBackdropView(camera()));
   assert.ok(triangles.length > 3000, `${triangles.length} triangles`);
 });
+
+test('the range is smooth: faces are not knife-edge steep and ridges are rounded', () => {
+  const slopes = [];
+  const creases = [];
+  const step = BACKDROP.columnSpacing;
+  for (let depth = BACKDROP.nearDepth; depth < BACKDROP.farDepth; depth += 90) {
+    for (let x = -2000; x < 2000; x += step) {
+      const a = heightAt(x, depth);
+      const b = heightAt(x + step, depth);
+      const c = heightAt(x + 2 * step, depth);
+      slopes.push(Math.max(Math.abs(b - a) / step, Math.abs(heightAt(x, depth + 90) - a) / 90));
+      creases.push(Math.abs(a - 2 * b + c));
+    }
+  }
+  const percentile = (values, share) => [...values].sort((x, y) => x - y)[Math.floor(share * (values.length - 1))];
+  // The knife-edged range measured p90 slope 1.21 and p90 crease 13.5 m.
+  assert.ok(percentile(slopes, 0.9) < 0.9, `steep faces: ${percentile(slopes, 0.9).toFixed(2)}`);
+  assert.ok(percentile(creases, 0.9) < 5, `creases: ${percentile(creases, 0.9).toFixed(1)} m`);
+  // Still a real mountain range: high peaks remain.
+  const skyline = [];
+  for (let x = -2000; x <= 2000; x += 25) skyline.push(heightAt(x, BACKDROP.farDepth * 0.8));
+  assert.ok(Math.max(...skyline) > BACKDROP.peakHeight * 0.6);
+});
+
+test('snow fades into rock and forest over a gradient, not at a hard line', async () => {
+  const { buildBackdrop: build } = await import('../src/backdrop.js');
+  const { triangles } = build(createBackdropView(camera()));
+  const colours = (fill) => fill.match(/\d+/g).map(Number);
+  // Neighbouring facets in a row differ in shade by light, but the colour
+  // never jumps between material palettes: the change per step stays small.
+  let jumps = 0;
+  let pairs = 0;
+  for (let index = 1; index < triangles.length; index += 1) {
+    if (triangles[index].depth !== triangles[index - 1].depth) continue;
+    const a = colours(triangles[index].fill);
+    const b = colours(triangles[index - 1].fill);
+    pairs += 1;
+    if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 120) jumps += 1;
+  }
+  assert.ok(jumps / pairs < 0.02, `${jumps} of ${pairs} neighbouring facets jump in colour`);
+});

@@ -80,11 +80,13 @@ const BELLY_HEIGHT = 1.05;
 
 /**
  * Put a body-frame skeleton into the world: roll it backwards by `flip`
- * about the belly, tip it by `pitch` about the body's left axis, turn it by
- * `heading` about the vertical, stand it at (x, y). Heading π faces the
- * skier the other way.
+ * about the belly, turn it by `heading` about the vertical (a spin; π rides
+ * switch), tip it by `pitch` to the slope along the way of travel, and face
+ * it the way of travel (`facing` -1 is leftwards), standing at (x, y).
+ * The slope tip comes after the turn so a switch rider's skis lie on the
+ * slope rather than mirrored across it.
  */
-export function placeJoints(joints, { x, y, pitch, heading, flip = 0 }) {
+export function placeJoints(joints, { x, y, pitch, heading, flip = 0, facing = 1 }) {
   const cosFlip = Math.cos(flip);
   const sinFlip = Math.sin(flip);
   const cosPitch = Math.cos(pitch);
@@ -96,11 +98,13 @@ export function placeJoints(joints, { x, y, pitch, heading, flip = 0 }) {
     const bellyY = isDirection ? 0 : BELLY_HEIGHT;
     const fx = point.x * cosFlip - (point.y - bellyY) * sinFlip;
     const fy = point.x * sinFlip + (point.y - bellyY) * cosFlip + bellyY;
-    const px = fx * cosPitch - fy * sinPitch;
-    const py = fx * sinPitch + fy * cosPitch;
-    const turnedX = px * cosHeading - point.z * sinHeading;
-    const turnedZ = px * sinHeading + point.z * cosHeading;
-    return isDirection ? { x: turnedX, y: py, z: turnedZ } : { x: x + turnedX, y: y + py, z: turnedZ };
+    const turnedX = fx * cosHeading - point.z * sinHeading;
+    const turnedZ = fx * sinHeading + point.z * cosHeading;
+    const tippedX = turnedX * cosPitch - fy * sinPitch;
+    const py = turnedX * sinPitch + fy * cosPitch;
+    const px = tippedX * facing;
+    const pz = turnedZ * facing;
+    return isDirection ? { x: px, y: py, z: pz } : { x: x + px, y: y + py, z: pz };
   };
   const placed = {};
   for (const [name, point] of Object.entries(joints)) placed[name] = place(point, name === 'skiDirection');

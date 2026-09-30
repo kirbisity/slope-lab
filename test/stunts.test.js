@@ -188,15 +188,30 @@ test('one tap of Flip backflips until the landing, as many times as the air allo
   const big = flipRide(bigJump, { x: -39, y: 38.7 }, 0, false, 0.05);
   assert.equal(big.skier.crashed, false, big.events.map((event) => event.kind || event.type).join(','));
   assert.ok(big.trick && big.trick.flips >= 1, 'at least one backflip on the big jump');
-  const hop = flipRide(gentle, { x: 0, y: 0.05 }, 8, true, 0);
-  assert.equal(hop.skier.crashed, false);
 });
 
-test('a flip tapped at any moment lands upright', () => {
-  for (let tapAt = 0; tapAt < 1.4; tapAt += 0.07) {
+test('a flip popped on a hop too short for it is committed and lands on the back', () => {
+  const hop = flipRide(gentle, { x: 0, y: 0.05 }, 8, true, 0);
+  assert.ok(hop.events.some((event) => event.type === 'crash' && event.kind === 'flip'), hop.events.map((event) => event.kind || event.type).join(','));
+});
+
+test('a flip tapped in the air starts at once: with air enough it lands, too late it lands on the back', () => {
+  const wholeFlip = (2 * Math.PI) / PHYSICS.flipRateTucked;
+  const nearlyWhole = (2 * Math.PI - PHYSICS.flipSafeAngle) / PHYSICS.flipRateTucked;
+  let landed = 0;
+  let onBack = 0;
+  for (let tapAt = 0; tapAt < bigAir - 0.1; tapAt += 0.05) {
     const attempt = flipRide(bigJump, { x: -39, y: 38.7 }, 0, false, tapAt);
-    assert.equal(attempt.skier.crashed, false, `tap at ${tapAt.toFixed(2)}: ${attempt.events.map((event) => event.kind || event.type).join(',')}`);
+    const story = `tap at ${tapAt.toFixed(2)}: ${attempt.events.map((event) => event.kind || event.type).join(',')}`;
+    if (tapAt + wholeFlip + PHYSICS.landingSpareSeconds < bigAir - 0.05) {
+      assert.equal(attempt.skier.crashed, false, story);
+      landed += 1;
+    } else if (tapAt + nearlyWhole > bigAir + 0.05) {
+      assert.ok(attempt.events.some((event) => event.type === 'crash' && event.kind === 'flip'), story);
+      onBack += 1;
+    }
   }
+  assert.ok(landed > 3 && onBack > 3, `${landed} landed, ${onBack} on the back`);
 });
 
 test('flip and spin together: a corked combo lands and scores both', () => {
@@ -255,13 +270,13 @@ test('Spin tapped on the snow is armed, and starts at the next takeoff', () => {
   assert.equal(skier.spinArmed, false, 'used up by the jump it was armed for');
 });
 
-test('Flip tapped with too little air left is dropped at the landing', () => {
-  // A pop hop is too short to finish a backflip.
+test('Flip armed on the snow waits for air enough, and is dropped at the landing', () => {
+  // A pop hop is too short to finish a backflip, so the armed flip never starts.
   const skier = createSkier({ x: 0, y: 0.05 });
   placeOnSurface(skier, gentle, 8, 1);
-  stepSkier(skier, gentle, { jump: true }, dt);
-  // Tapped half way through the hop: a whole backflip no longer fits.
-  for (let step = 0; step < 480 && skier.mode === 'air'; step += 1) stepSkier(skier, gentle, { flip: step === 96 }, dt);
+  stepSkier(skier, gentle, { jump: true, flip: true }, dt);
+  assert.equal(skier.flipArmed, true);
+  for (let step = 0; step < 480 && skier.mode === 'air'; step += 1) stepSkier(skier, gentle, {}, dt);
   assert.equal(skier.mode, 'ground');
   assert.equal(skier.crashed, false);
   assert.equal(skier.flipArmed, false, 'not carried on to the next jump');

@@ -52,7 +52,7 @@ const state = {
   // between two frames still counts, then momentum does the rest.
   spinBufferSeconds: 0,
   flipBufferSeconds: 0,
-  look: { tuck: 0, pitch: 0, tumble: 0, brake: false },
+  look: { tuck: 0, pitch: 0, tumble: 0, hockey: 0 },
   particles: [],
   camera: createCamera(),
   rideZoom: 24,
@@ -236,7 +236,7 @@ function startRide() {
   state.mode = 'ride';
   state.paused = false;
   state.particles = [];
-  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, brake: false, yaw: 0, lostGear: false };
+  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, hockey: 0, yaw: 0, lostGear: false };
   state.accumulator = 0;
   state.gForce = 1;
   state.resultTimer = 0;
@@ -327,6 +327,7 @@ const CRASH_MESSAGES = {
   sideways: 'Landed sideways!',
   flip: 'Landed on your back!',
   'switch-big-air': 'Too much air to land backwards',
+  edge: 'Caught an edge! Too fast or too steep to stop',
 };
 
 // Spin and Flip are taps that arm the trick: it starts the moment a whole
@@ -422,8 +423,18 @@ function updateParticles(dt) {
   if (run && run.status === 'running' && !state.paused && run.skier.mode === 'ground') {
     const skier = run.skier;
     const speed = Math.abs(skier.speed);
-    const controls = currentControls();
-    const rate = controls.brake ? speed * 6 : speed > 12 ? (speed - 12) * 1.2 : 0;
+    // A hockey stop throws a sheet of snow off the edges, forward and to the
+    // downhill side of the skis; plain gliding kicks a little up behind.
+    const hockeySpray = skier.hockey * speed * 14;
+    const hockeySpawn = hockeySpray * dt + (Math.random() < (hockeySpray * dt) % 1 ? 1 : 0);
+    for (let index = 0; index < hockeySpawn && state.particles.length < VIEW.maxParticles; index += 1) {
+      state.particles.push({
+        x: skier.x + skier.vx * 0.02, y: skier.y + 0.05, z: 0.3 + Math.random() * 0.4,
+        vx: skier.vx * (1 + Math.random() * 0.5), vy: 1.5 + Math.random() * 3, vz: 1 + Math.random() * 3,
+        life: 0.4 + Math.random() * 0.5, maxLife: 0.9, size: 0.05 + Math.random() * 0.08,
+      });
+    }
+    const rate = speed > 12 && skier.hockey === 0 ? (speed - 12) * 1.2 : 0;
     const spawn = rate * dt + (Math.random() < (rate * dt) % 1 ? 1 : 0);
     for (let index = 0; index < spawn && state.particles.length < VIEW.maxParticles; index += 1) {
       state.particles.push({
@@ -587,7 +598,7 @@ function tick(dt) {
   if (!state.paused) updateParticles(dt);
   const riding = state.run && state.run.status === 'running' && !state.paused;
   const skier = state.run && state.run.skier;
-  updateAmbience(state.audio, riding ? speedOf(skier) : 0, riding && skier.mode === 'ground', riding && currentControls().brake);
+  updateAmbience(state.audio, riding ? speedOf(skier) : 0, riding && skier.mode === 'ground', riding && skier.hockey > 0.3);
   state.shake *= Math.exp(-SHAKE_DECAY_PER_SECOND * dt);
   draw();
   updateReadout(dt);
@@ -630,7 +641,7 @@ function updateLook(dt) {
   const flipping = run.skier.mode === 'air' && (run.skier.flipping || run.skier.flipRate > 0);
   look.flipping = (look.flipping || 0) + ((flipping ? 1 : 0) - (look.flipping || 0)) * Math.min(1, dt * 12);
   look.body = state.body;
-  look.brake = controls.brake && run.skier.mode === 'ground' && !run.skier.switchStance;
+  look.hockey = run.skier.hockey;
   const difference = Math.atan2(Math.sin(run.skier.pitch - look.pitch), Math.cos(run.skier.pitch - look.pitch));
   look.pitch += difference * Math.min(1, dt * 18);
   if (run.skier.crashed) look.tumble += dt * Math.max(0, 9 - run.crashSeconds * 3);

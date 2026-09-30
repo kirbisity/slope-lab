@@ -12,9 +12,23 @@ export const PHYSICS = {
   // reach ~0.25 m². Terminal speed on a 30° pitch: ~32 m/s upright, ~49 tucked.
   dragAreaUpright: 0.6,
   dragAreaTuck: 0.25,
-  // Waxed ski on groomed snow is 0.03–0.06; a snowplough digs the edges in.
+  // Waxed ski on groomed snow is 0.03–0.06.
   snowFriction: 0.045,
-  brakeFriction: 0.3,
+  // Brake is a hockey stop: the skis swing across the way of travel over
+  // hockeyTurnSeconds and the edges bite. Edge grip is a friction coefficient
+  // against the snow's push (0.55 holds against gravity up to ~29°), and the
+  // snow the edges throw out slows the rider in proportion to speed. Past
+  // ~29° grip loses to gravity and the spray only caps the speed at
+  // g(sinθ − μcosθ)/k: ~12 m/s on 40°, so the rider never truly stops.
+  hockeyGrip: 0.55,
+  hockeySprayDrag: 0.15,
+  hockeyTurnSeconds: 0.25,
+  // Once the skis are fully across, too much speed or too steep a slope
+  // catches the downhill edge and throws the rider over the tips. The limit
+  // is (speed / hockeyCrashSpeed)² + (slope / hockeyCrashSlope)² > 1: a stop
+  // from a Joyride cruise (22 m/s on 20°) holds, 25 m/s on 30° does not.
+  hockeyCrashSpeed: 30,
+  hockeyCrashSlope: 0.7,
   // A fallen skier slides on jacket and pants, which run on snow nearly as
   // freely as skis do: a crash carries on down a slope.
   crashFriction: 0.3,

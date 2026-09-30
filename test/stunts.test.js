@@ -213,7 +213,7 @@ test('landing a flip is judged on being upright', async () => {
   assert.deepEqual(flipOutcome(Math.PI), { crash: 'flip' });
 });
 
-test('real riders stop a rotation a little off: some spins and fewer flips crash', () => {
+test('real riders stop a rotation a little off: some spins and more flips crash', () => {
   PHYSICS.spinSpotError = SPOT_ERROR;
   PHYSICS.flipSpotError = FLIP_SPOT_ERROR;
   setRandomSource(seededRandom(2026));
@@ -232,7 +232,7 @@ test('real riders stop a rotation a little off: some spins and fewer flips crash
     const spinRate = spinCrashes / jumps;
     // Enough to feel risky, never so many that tricks stop being worth trying.
     assert.ok(spinRate > 0.05 && spinRate < 0.4, `${spinCrashes} of ${jumps} spins crash`);
-    assert.ok(flipCrashes / jumps > 0.03 && flipCrashes / jumps < 0.4, `${flipCrashes} of ${jumps} flips crash`);
+    assert.ok(flipCrashes > spinCrashes && flipCrashes / jumps < 0.45, `${flipCrashes} flips and ${spinCrashes} spins of ${jumps} crash`);
   } finally {
     PHYSICS.spinSpotError = 0;
     PHYSICS.flipSpotError = 0;
@@ -255,7 +255,7 @@ test('Spin tapped on the snow is armed, and starts at the next takeoff', () => {
   assert.equal(skier.spinArmed, false, 'used up by the jump it was armed for');
 });
 
-test('Flip tapped with too little air left stays armed for the next jump', () => {
+test('Flip tapped with too little air left is dropped at the landing', () => {
   // A pop hop is too short to finish a backflip.
   const skier = createSkier({ x: 0, y: 0.05 });
   placeOnSurface(skier, gentle, 8, 1);
@@ -264,5 +264,5 @@ test('Flip tapped with too little air left stays armed for the next jump', () =>
   for (let step = 0; step < 480 && skier.mode === 'air'; step += 1) stepSkier(skier, gentle, { flip: step === 96 }, dt);
   assert.equal(skier.mode, 'ground');
   assert.equal(skier.crashed, false);
-  assert.equal(skier.flipArmed, true, 'still armed after the short hop');
+  assert.equal(skier.flipArmed, false, 'not carried on to the next jump');
 });

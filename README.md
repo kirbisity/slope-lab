@@ -36,7 +36,7 @@ Works with mouse, keyboard, touch and pen, on phones and desktops.
 ## Courses
 
 - **Joyride** — the first level: a new random slope every time, no maths
-  needed. Every slope is built from equations (1 − cos rollers, half-cosine
+  needed; runs are 450 m to over a kilometre. Every slope is built from equations (1 − cos rollers, half-cosine
   drops, landing hills fitted to a measured takeoff) and ridden hands-off
   before it is offered, so it is always finishable. Finish one and the game
   points you to the equation challenges; Joyride stays first in the list.
@@ -67,6 +67,7 @@ course is proven solvable.
 | `src/joyride.js` | The random slope generator and its hands-off validation |
 | `src/debris.js` | Skis, poles and helmet thrown off in a crash, each with its own physics |
 | `src/ragdoll.js` | The body: load-driven springs while skiing, a Verlet ragdoll that folds and rolls in a crash |
+| `src/model.js` | The skier as a lit 3D mesh built from one skeleton, driven by the pose or the ragdoll |
 | `src/ghost.js`, `src/audio.js` | Best-run ghost recording; procedural sound |
 
 ```sh

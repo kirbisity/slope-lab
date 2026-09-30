@@ -143,7 +143,9 @@ function buildCandidate(seed) {
   const pick = (low, high) => low + (high - low) * random();
   const course = builder(random);
   course.x = -12;
-  course.y = 40 + Math.round(pick(0, 20));
+  // A long run needs the height to lose: start high enough to stay above
+  // the finish however many features follow.
+  course.y = 140 + Math.round(pick(0, 50));
   course.topY = course.y;
   course.slope = 0.25;
   const start = { x: -10, y: course.y - 0.25 * 2 + 0.3 };
@@ -152,16 +154,17 @@ function buildCandidate(seed) {
 
   // At least two kickers: at speed the crest limit keeps rollers and drops
   // gentle, so the jumps are what makes each slope feel different.
-  const middle = Array.from({ length: 2 + Math.floor(random() * 3) }, () => ['roller', 'drop', 'kicker', 'cruise'][Math.floor(random() * 4)]);
+  // Long runs: twelve to fifteen features between the opening and closing kickers.
+  const middle = Array.from({ length: 12 + Math.floor(random() * 4) }, () => ['roller', 'drop', 'kicker', 'cruise'][Math.floor(random() * 4)]);
   const features = ['kicker', ...middle, 'kicker'];
   if (random() < 0.5) features.unshift(random() < 0.5 ? 'roller' : 'drop');
   for (const feature of features) {
-    if (feature === 'roller') roller(course, pick(16, 26), pick(0.8, 2.2));
-    if (feature === 'drop') drop(course, pick(14, 24), pick(3, 7));
-    if (feature === 'cruise') cruise(course, pick(8, 16));
+    if (feature === 'roller') roller(course, pick(20, 32), pick(0.8, 2.2));
+    if (feature === 'drop') drop(course, pick(18, 30), pick(3, 7));
+    if (feature === 'cruise') cruise(course, pick(14, 26));
     if (feature === 'kicker') {
       if (!kicker(course, start, pick(8, 12), pick(0.1, 0.35), pick(1.6, 2.2))) return null;
-      bend(course, pick(0.3, 0.45), pick(18, 26));
+      bend(course, pick(0.3, 0.45), pick(22, 32));
     }
   }
   bend(course, 0.05, pick(22, 30));
@@ -186,7 +189,7 @@ function buildCandidate(seed) {
 /** Accept a slope only if a hands-off ride finishes it cleanly. */
 export function validateJoyride(course) {
   const pieces = course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
-  const { run } = simulateRun(course, pieces, buildSurfaces(pieces), {}, 90);
+  const { run } = simulateRun(course, pieces, buildSurfaces(pieces), {}, 170);
   // A second of air is enough for a 360: ~0.7 s wrapped up plus the open turn.
   return run.status === 'finished' && run.ouch === 0 && run.stats.longestAir >= 1 ? run : null;
 }

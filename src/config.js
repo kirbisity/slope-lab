@@ -108,8 +108,10 @@ export const RAGDOLL = {
   substeps: 4,
   constraintPasses: 6,
   airDamping: 0.999,
-  // Kept per contact substep: snow grips a tumbling body.
-  contactFriction: 0.25,
+  // Share of the slide the snow takes per contact substep. Grip is what
+  // turns a sliding body into a rolling one; four limbs touch more snow
+  // than two, so this rose from 0.25 when the ragdoll gained both sides.
+  contactFriction: 0.4,
   // Contact margin keeps joints just clear of the surface they touch.
   contactLift: 0.005,
   // Joints that touched snow in the last few substeps are dragged by it

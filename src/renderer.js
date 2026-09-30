@@ -4,6 +4,7 @@ import { project } from './camera.js';
 import { groundBelow } from './track.js';
 import { createBackdropView, buildBackdrop, backdropDrift, cacheShift } from './backdrop.js';
 import { BACKDROP, BODY } from './config.js';
+import { posedJoints, placeJoints, ragdollJoints, buildSkierMesh, faceNormal, isFrontFacing, MODEL_PALETTE, GHOST_MODEL_PALETTE } from './model.js';
 import { sweepSurfaces, dragCoefficient } from './physics.js';
 
 const SNOW_LIT = [250, 252, 255];
@@ -495,144 +496,70 @@ export function skierPose(skier, look) {
   return pose;
 }
 
-/** The same joints in world metres, as a crash ragdoll starts from them. */
-export function skierJointsInWorld(skier, look) {
-  const pose = skierPose(skier, look);
-  const cos = Math.cos(look.pitch);
-  const sin = Math.sin(look.pitch);
-  const world = ([x, y]) => ({ x: skier.x + skier.facing * (x * cos - y * sin), y: skier.y + x * sin + y * cos });
-  const hand = world(pose.hand);
-  const shoulder = world(pose.shoulder);
-  return {
-    foot: world([0, 0.08]), knee: world(pose.knee), hip: world(pose.hip), shoulder, head: world(pose.head), hand,
-    elbow: { x: (shoulder.x + hand.x) / 2, y: (shoulder.y + hand.y) / 2 - 0.08 },
-  };
+// Heading about the vertical: the spin, plus a half turn when facing left.
+function headingOf(skier, look) {
+  return (look.yaw || 0) + (skier.facing < 0 ? Math.PI : 0);
 }
 
-const SKIER_PALETTE = { jacket: COLORS.jacket, sleeve: '#c9461f', pants: COLORS.pants, farLeg: '#18243a', farSki: '#8a2f17', helmet: '#f4f6fa', goggles: '#e8a33a', pole: '#6a7383' };
-const GHOST_PALETTE = { jacket: '#2f7dd1', sleeve: '#2a6cb6', pants: '#1d4f8f', farLeg: '#1d4f8f', farSki: '#2a6cb6', helmet: '#e8f1fb', goggles: '#9cc4f0', pole: '#4a6d96' };
+function placedSkeleton(skier, look) {
+  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: headingOf(skier, look) });
+}
 
-function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1) {
-  const feet = project(camera, skier.x, skier.y, 0);
-  const scale = feet.scale;
+/** The skeleton in the course plane, as a crash ragdoll starts from it. */
+export function skierJointsInWorld(skier, look) {
+  const placed = placedSkeleton(skier, look);
+  const flat = (point) => ({ x: point.x, y: point.y });
+  const middle = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const joints = { hip: middle(placed.hipL, placed.hipR), shoulder: middle(placed.shoulderL, placed.shoulderR), head: flat(placed.head) };
+  for (const name of ['footL', 'footR', 'kneeL', 'kneeR', 'elbowL', 'elbowR', 'handL', 'handR']) joints[name] = flat(placed[name]);
+  return joints;
+}
+
+
+// The model is lit by the same sun as the mountains.
+const MODEL_SUN = (() => { const x = 0.62; const y = 0.68; const z = -0.4; const l = Math.hypot(x, y, z); return { x: x / l, y: y / l, z: z / l }; })();
+const MODEL_AMBIENT = 0.45;
+
+/** Project, cull, light and paint a model's faces, far to near. */
+function renderModel(ctx, camera, faces, palette, alpha) {
+  const visible = [];
+  for (const face of faces) {
+    const screen = face.points.map((point) => project(camera, point.x, point.y, point.z));
+    if (!isFrontFacing(screen)) continue;
+    let depth = 0;
+    for (const point of face.points) depth += point.z - point.y * 0.2;
+    visible.push({ face, screen, depth: depth / face.points.length });
+  }
+  visible.sort((a, b) => b.depth - a.depth);
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(feet.x, feet.y);
-  ctx.scale(skier.facing, 1);
-  // Heading about the vertical axis. A point `along` the ski and `across`
-  // it sits at along·cos(yaw) − across·sin(yaw) down the slope and at depth
-  // along·sin(yaw) + across·cos(yaw). Slope distance follows the pitch;
-  // depth rises straight up the screen, exactly as the snow lane does.
-  const yaw = look.yaw || 0;
-  const cosYaw = Math.cos(yaw);
-  const sinYaw = Math.sin(yaw);
-  const pitch = look.pitch;
-  const geared = !look.lostGear;
-  if (geared) {
-    ctx.save();
-    ctx.scale(scale, -scale);
-    const skiPoint = (along, across, lift = 0) => {
-      const down = along * cosYaw - across * sinYaw;
-      const depth = along * sinYaw + across * cosYaw;
-      return [down * Math.cos(pitch) - (0.02 + lift) * Math.sin(pitch), down * Math.sin(pitch) + (0.02 + lift) * Math.cos(pitch) + depth * VIEW.depthLift];
-    };
-    const drawSki = (across, color) => {
-      const tail = skiPoint(-0.85, across);
-      const bend = skiPoint(0.8, across);
-      const tip = skiPoint(1.02, across, 0.12);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 0.07;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(tail[0], tail[1]);
-      ctx.lineTo(bend[0], bend[1]);
-      ctx.lineTo(tip[0], tip[1]);
-      ctx.stroke();
-    };
-    // The ski further from the camera goes down first.
-    const farSide = cosYaw >= 0 ? 0.11 : -0.11;
-    drawSki(farSide, palette.farSki);
-    drawSki(-farSide, palette.jacket);
-    ctx.restore();
-  }
-  ctx.rotate(-pitch);
-  if (skier.crashed) ctx.rotate(-look.tumble);
-  ctx.scale(scale, -scale);
-
-  const pose = skierPose(skier, look);
-
-  const line = (from, to, width, color) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.beginPath(); ctx.moveTo(from[0], from[1]); ctx.lineTo(to[0], to[1]); ctx.stroke();
-  };
-  ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
-  // The body turns with the skis: mirrored past 90°, foreshortened near it.
-  ctx.save();
-  ctx.scale((cosYaw >= 0 ? 1 : -1) * Math.max(0.38, Math.abs(cosYaw)), 1);
-  line([0.06, 0.12], [pose.knee[0] + 0.05, pose.knee[1] + 0.03], 0.17, palette.farLeg);
-  line([pose.knee[0] + 0.05, pose.knee[1] + 0.03], [pose.hip[0] + 0.03, pose.hip[1]], 0.19, palette.farLeg);
-  if (geared) line(pose.shoulder, [pose.poleTip[0] + 0.05, pose.poleTip[1] + 0.02], 0.025, palette.pole);
-
-  line([0, 0.12], pose.knee, 0.18, palette.pants);
-  line(pose.knee, pose.hip, 0.2, palette.pants);
-  ctx.fillStyle = palette.farLeg;
-  ctx.fillRect(-0.1, 0.02, 0.24, 0.16);
-  line(pose.hip, pose.shoulder, 0.34, palette.jacket);
-  line(pose.shoulder, pose.hand, 0.13, palette.sleeve);
-  if (geared) line(pose.hand, pose.poleTip, 0.03, palette.pole);
-
-  if (geared) {
-    ctx.fillStyle = palette.helmet;
-    ctx.beginPath(); ctx.arc(pose.head[0], pose.head[1], 0.14, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = palette.goggles;
+  ctx.lineWidth = 0.6;
+  for (const { face, screen } of visible) {
+    const normal = faceNormal(face.points);
+    const light = MODEL_AMBIENT + (1 - MODEL_AMBIENT) * Math.max(0, normal.x * MODEL_SUN.x + normal.y * MODEL_SUN.y + normal.z * MODEL_SUN.z);
+    const base = palette[face.material];
+    const colour = `rgb(${Math.round(base[0] * light)},${Math.round(base[1] * light)},${Math.round(base[2] * light)})`;
+    ctx.fillStyle = colour;
+    ctx.strokeStyle = colour;
     ctx.beginPath();
-    ctx.ellipse(pose.head[0] + 0.08, pose.head[1] - 0.01, 0.07, 0.045, 0, 0, Math.PI * 2);
+    ctx.moveTo(screen[0].x, screen[0].y);
+    for (let index = 1; index < screen.length; index += 1) ctx.lineTo(screen[index].x, screen[index].y);
+    ctx.closePath();
     ctx.fill();
-  } else {
-    // Helmet gone: a bare head with windswept hair.
-    ctx.fillStyle = '#f1c7a3';
-    ctx.beginPath(); ctx.arc(pose.head[0], pose.head[1], 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3b2a20';
-    ctx.beginPath(); ctx.arc(pose.head[0] - 0.02, pose.head[1] + 0.03, 0.12, Math.PI * 0.05, Math.PI * 1.05); ctx.fill();
+    ctx.stroke();
   }
-  ctx.restore();
   ctx.restore();
 }
 
+function drawSkier(ctx, camera, skier, look, palette = MODEL_PALETTE, alpha = 1) {
+  const faces = buildSkierMesh(placedSkeleton(skier, look), { gear: !look.lostGear });
+  renderModel(ctx, camera, faces, palette, alpha);
+}
+
+// The same model, driven by the ragdoll's joints: bare-headed, no gear.
 function drawRagdoll(ctx, camera, ragdoll) {
-  const points = ragdoll.points;
-  const at = (name, offset = 0) => project(camera, points[name].x + offset, points[name].y, 0);
-  const scale = at('hip').scale;
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const limb = (names, width, colour, offset = 0) => {
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = Math.max(2, width * scale);
-    ctx.beginPath();
-    names.forEach((name, index) => {
-      const point = at(name, offset);
-      if (index === 0) ctx.moveTo(point.x, point.y); else ctx.lineTo(point.x, point.y);
-    });
-    ctx.stroke();
-  };
-  // The far leg and arm trail a little behind, darker, for depth.
-  limb(['foot', 'knee', 'hip'], 0.18, SKIER_PALETTE.farLeg, 0.08);
-  limb(['shoulder', 'elbow', 'hand'], 0.12, '#a93c1b', 0.08);
-  limb(['foot', 'knee', 'hip'], 0.19, SKIER_PALETTE.pants);
-  limb(['hip', 'shoulder'], 0.34, SKIER_PALETTE.jacket);
-  limb(['shoulder', 'elbow', 'hand'], 0.13, SKIER_PALETTE.sleeve);
-  const head = at('head');
-  ctx.fillStyle = '#f1c7a3';
-  ctx.beginPath(); ctx.arc(head.x, head.y, 0.12 * scale, 0, Math.PI * 2); ctx.fill();
-  const neck = at('shoulder');
-  const away = Math.atan2(head.y - neck.y, head.x - neck.x);
-  ctx.fillStyle = '#3b2a20';
-  ctx.beginPath(); ctx.arc(head.x, head.y, 0.12 * scale, away - Math.PI * 0.55, away + Math.PI * 0.55); ctx.fill();
-  ctx.restore();
+  renderModel(ctx, camera, buildSkierMesh(ragdollJoints(ragdoll), { gear: false }), MODEL_PALETTE, 1);
 }
 
 function drawGear(ctx, camera, items) {
@@ -853,7 +780,7 @@ export function renderScene(ctx, camera, scene) {
     if (scene.prediction) drawPrediction(ctx, camera, scene.prediction);
     if (scene.ghost) {
       const ghostSkier = { ...scene.ghost, mode: 'air', crashed: false };
-      drawSkier(ctx, camera, ghostSkier, { tuck: 0.4, pitch: scene.ghost.pitch, tumble: 0, brake: false }, GHOST_PALETTE, 0.5);
+      drawSkier(ctx, camera, ghostSkier, { tuck: 0.4, pitch: scene.ghost.pitch, tumble: 0, brake: false }, GHOST_MODEL_PALETTE, 0.5);
       const tag = project(camera, scene.ghost.x, scene.ghost.y + 1.9, 0);
       ctx.save();
       ctx.globalAlpha = 0.8;

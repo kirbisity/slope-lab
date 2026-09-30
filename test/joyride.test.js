@@ -12,6 +12,8 @@ test('200 random seeds all give a slope a hands-off skier finishes cleanly', () 
     lengths.push(course.finish.x);
   }
   assert.deepEqual(failures, []);
+  // Long runs: every slope is at least 450 m to the finish.
+  assert.ok(Math.min(...lengths) >= 450, `shortest ${Math.min(...lengths).toFixed(0)} m`);
   // Variety: slopes differ in length, not just in shape.
   assert.ok(Math.max(...lengths) - Math.min(...lengths) > 80, `lengths ${Math.min(...lengths)}–${Math.max(...lengths)}`);
 });

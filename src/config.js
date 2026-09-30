@@ -45,6 +45,10 @@ export const PHYSICS = {
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
+  // The rider sees the landing coming: this often (s) they look ahead along
+  // the flight, and they start lining up with this much time to spare.
+  landingLookAheadSeconds: 0.05,
+  landingSpareSeconds: 0.06,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:

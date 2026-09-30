@@ -7,12 +7,11 @@
 
 export const SIZES = [[360, 640], [390, 844], [414, 736], [844, 390], [667, 375], [768, 1024], [1024, 768], [1280, 720], [1440, 900]];
 
-const MUST_FIT = ['.topbar', '.tools', '.ride-bar', '.readout', '.ride-controls .hold-pair:first-child', '.ride-controls .hold-pair:last-child', '#tracks-panel', '.overlay:not([hidden]) .sheet'];
+const MUST_FIT = ['.topbar', '.tools', '.ride-bar', '.readout', '#brake-button', '#jump-button', '#tracks-panel', '.overlay:not([hidden]) .sheet'];
 const MUST_NOT_OVERLAP = [
   ['.tools', '.ride-bar'], ['.readout', '.ride-bar'], ['.readout', '.tools'],
-  ['.ride-controls .hold-pair:last-child', '.ride-bar'], ['.ride-controls .hold-pair:first-child', '.ride-bar'],
-  ['.ride-controls .hold-pair:first-child', '.readout'], ['.ride-controls .hold-pair:last-child', '.readout'],
-  ['.ride-controls .hold-pair:first-child', '.ride-controls .hold-pair:last-child'],
+  ['#brake-button', '.ride-bar'], ['#spin-button', '.ride-bar'], ['#flip-button', '.ride-bar'], ['#tuck-button', '.ride-bar'], ['#jump-button', '.ride-bar'],
+  ['#brake-button', '.readout'], ['#jump-button', '.readout'],
   ['.readout', '.topbar'], ['.tools', '.topbar'], ['#tracks-panel', '.tools'], ['#tracks-panel', '.readout'], ['#tracks-panel', '.topbar'],
 ];
 const MUST_NOT_OVERFLOW = ['.topbar', '.overlay:not([hidden]) .sheet', '.equation-form', '.overlay:not([hidden]) .course-grid', '.overlay:not([hidden]) .help-pages'];

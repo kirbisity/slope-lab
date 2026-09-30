@@ -152,11 +152,12 @@ body.riding .readout { left: calc(12px + var(--safe-left)); }
 
 /* --------------------------------------------------------- ride controls */
 .ride-controls {
-  position: absolute; left: calc(16px + var(--safe-left)); right: calc(16px + var(--safe-right));
-  bottom: calc(92px + var(--safe-bottom));
-  display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; z-index: 4;
+  /* Every ride button in one row along the bottom, Pause/Reset just above. */
+  position: absolute; left: 0; right: 0; bottom: calc(12px + var(--safe-bottom));
+  display: flex; justify-content: center; gap: 10px; pointer-events: none; z-index: 4;
+  --row: 62px;
 }
-.hold-pair { display: flex; gap: 10px; }
+body.riding .ride-bar { bottom: calc(12px + var(--row, 62px) + 12px + var(--safe-bottom)); }
 .hold {
   pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -172,7 +173,6 @@ body.riding .readout { left: calc(12px + var(--safe-left)); }
 .hold.spin.active { background: var(--ice); }
 .hold.backflip { background: rgba(32, 163, 107, 0.82); }
 .hold.backflip.active { background: var(--pine); }
-.hold-pair.tricks { flex-wrap: nowrap; }
 .hold.active { background: var(--ink); transform: scale(0.95); }
 .hold.jump.active { background: var(--accent); }
 body.editing .ride-controls { display: none; }
@@ -315,7 +315,7 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .tool { width: auto; flex: 1; padding: 7px 0 5px; font-size: 10.5px; }
   .tool.secondary, .tool-gap { display: none; }
   .ride-bar { bottom: calc(76px + var(--safe-bottom)); }
-  body.riding .ride-bar { bottom: calc(16px + var(--safe-bottom)); left: 50%; }
+  body.riding .ride-bar { bottom: calc(10px + 50px + 10px + var(--safe-bottom)); left: 50%; }
   .ride-button { height: 50px; padding: 0 22px 0 18px; font-size: 21px; }
   .readout { left: calc(8px + var(--safe-left)); top: calc(var(--bar) + var(--safe-top) + 8px); padding: 6px 10px 6px 6px; gap: 10px; }
   body.riding .readout { left: calc(8px + var(--safe-left)); }
@@ -324,11 +324,9 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .gauges { gap: 3px 10px; }
   .gauges dt { min-width: 0; font-size: 10px; }
   .gauges dd { font-size: 12.5px; min-width: 50px; }
-  .ride-controls { bottom: calc(80px + var(--safe-bottom)); }
+  .ride-controls { bottom: calc(10px + var(--safe-bottom)); gap: 8px; }
   .hold { width: 50px; height: 50px; font-size: 11.5px; }
   .hold kbd { display: none; }
-  /* Four trick buttons as a 2×2 grid under the right thumb. */
-  .hold-pair.tricks { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
   /* The sheet sits on top of the tool bar so the tools stay reachable. */
   .tracks-panel {
     left: calc(6px + var(--safe-left)); right: calc(6px + var(--safe-right)); top: auto; bottom: calc(62px + var(--safe-bottom)); width: auto; max-height: min(58%, 460px);
@@ -368,7 +366,8 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .speed { width: 54px; height: 44px; }
   .speed-value { font-size: 21px; }
   .gauges dd { font-size: 12px; }
-  .ride-controls { bottom: calc(10px + var(--safe-bottom)); }
+  .ride-controls { bottom: calc(8px + var(--safe-bottom)); gap: 8px; }
+  body.riding .ride-bar { bottom: calc(8px + 48px + 8px + var(--safe-bottom)); }
   .hold { width: 48px; height: 48px; font-size: 11px; }
   .hold kbd { display: none; }
   body.riding .readout { left: calc(8px + var(--safe-left)); }

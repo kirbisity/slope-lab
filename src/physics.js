@@ -418,10 +418,10 @@ export function setRandomSource(source) {
 }
 
 // How far off this rider stops a rotation on this jump (radians).
-// u^5 keeps most stops close and a few well off.
+// A high shape keeps most stops close and a few well off.
 function spotErrorFor(spread) {
   const unit = random() * 2 - 1;
-  return spread * unit ** 5;
+  return spread * Math.sign(unit) * Math.abs(unit) ** PHYSICS.spotErrorShape;
 }
 
 /**

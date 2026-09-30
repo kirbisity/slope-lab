@@ -29,12 +29,12 @@ export const PHYSICS = {
   // clear a roller or add height at a lip.
   jumpImpulse: 4,
   // Holding Spin wraps the arms in and turns the body about the vertical
-  // axis: 17 rad/s is a 360 in ~0.37 s. Letting go opens the arms and the
+  // axis: 12 rad/s is a 360 in ~0.52 s. Letting go opens the arms and the
   // rider spots the landing: the turn carries on at the open rate (a fifth,
   // as angular momentum demands) until the body faces straight down the
   // hill or straight back, then holds there. A release crashes only if the
   // air runs out before that heading comes round.
-  spinRateTucked: 17,
+  spinRateTucked: 12,
   openSpinFactor: 0.2,
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), less;
@@ -47,26 +47,28 @@ export const PHYSICS = {
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
   // Flip tucks the knees and rolls the body backwards about the belly:
-  // 9 rad/s is a backflip in ~0.7 s, slower than a spin because the body is
-  // long in that direction. It lines up upright at the open rate, like a spin.
-  flipRateTucked: 9,
+  // 7.5 rad/s is a backflip in ~0.84 s, slower than a spin because the body
+  // is long in that direction. Kept fast enough that a flip plus the landing
+  // spare fits Joyride's shortest jumps (1 s of air).
+  flipRateTucked: 7.5,
   // Off upright at touchdown: past the first a sketchy landing, past the
   // second the skier lands on their back.
   flipCleanAngle: 0.3,
   flipSafeAngle: 0.6,
   // Flips stop a little off upright the same way spins stop off heading.
-  flipSpotError: 0.8,
+  flipSpotError: 0.9,
   // The rider sees the landing coming: this often (s) they look ahead along
   // the flight, and they start lining up with this much time to spare.
   landingLookAheadSeconds: 0.05,
   landingSpareSeconds: 0.06,
-  // Riders never stop a spin exactly on the heading. Each jump the stop is
-  // off by spinSpotError × u^5, u drawn fresh in ±1: mostly a few degrees,
-  // now and then a lot. The
-  // share of spins that crash is 1 − (safe angle / spinSpotError)^(1/5):
-  // with 1.15 rad about 4% of forward landings and 15% of the tighter
-  // switch ones, about one tapped spin in ten across Joyride's jumps.
-  spinSpotError: 1.15,
+  // Riders never stop a rotation exactly where they aim. Each jump the stop
+  // is off by spotError × u^spotErrorShape, u drawn fresh in ±1. A higher
+  // shape keeps most stops close; lower makes the line-up weaker. The share
+  // of spins that crash is 1 − (safe angle / spinSpotError)^(1/shape): with
+  // shape 3 and 1.1 rad about 10% of forward landings and 29% of the
+  // tighter switch ones; flips about 13%.
+  spotErrorShape: 3,
+  spinSpotError: 1.1,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:

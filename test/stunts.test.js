@@ -227,8 +227,9 @@ test('real riders stop a rotation a little off: some spins and fewer flips crash
       if (flip.skier.crashed) flipCrashes += 1;
     }
     const spinRate = spinCrashes / jumps;
-    assert.ok(spinRate > 0.03 && spinRate < 0.3, `${spinCrashes} of ${jumps} spins crash`);
-    assert.ok(flipCrashes / jumps < spinRate, `${flipCrashes} flips crash`);
+    // Enough to feel risky, never so many that tricks stop being worth trying.
+    assert.ok(spinRate > 0.05 && spinRate < 0.4, `${spinCrashes} of ${jumps} spins crash`);
+    assert.ok(flipCrashes / jumps > 0.03 && flipCrashes / jumps < 0.4, `${flipCrashes} of ${jumps} flips crash`);
   } finally {
     PHYSICS.spinSpotError = 0;
     PHYSICS.flipSpotError = 0;

@@ -145,8 +145,8 @@ export const JOYRIDE_CARD = {
   id: 'joyride',
   name: 'Joyride',
   difficulty: 'joyride',
-  brief: 'A new random slope every time. No maths needed: tuck, pop and flip.',
-  stars: [{ type: 'finish' }, { type: 'minFlips', value: 1 }, { type: 'maxOuch', value: 0 }],
+  brief: 'A new random slope every time. No maths needed: tuck, pop and spin.',
+  stars: [{ type: 'finish' }, { type: 'minRotation', value: 360 }, { type: 'maxOuch', value: 0 }],
 };
 
 // Picker order: ride first, then build with equations, then free build.

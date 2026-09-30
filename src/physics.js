@@ -28,6 +28,7 @@ export function createSkier(start) {
     crashed: false,
     spin: 0,
     spinRate: 0,
+    switchStance: false,
     airSeconds: 0,
     groundedSeconds: 0,
   };
@@ -40,7 +41,9 @@ export function dragCoefficient(controls) {
 
 function frictionCoefficient(skier, controls) {
   if (skier.crashed) return PHYSICS.crashFriction;
-  return controls.brake ? PHYSICS.brakeFriction : PHYSICS.snowFriction;
+  // A snowplough needs the ski tips together in front: riding switch there
+  // is no way to brake.
+  return controls.brake && !skier.switchStance ? PHYSICS.brakeFriction : PHYSICS.snowFriction;
 }
 
 function segmentGeometry(surface, index) {
@@ -317,33 +320,49 @@ function stepAir(skier, surfaces, controls, dt, events) {
   skier.speed = skier.vx * segment.tx + skier.vy * segment.ty;
   skier.curveAccel = 0;
   syncGroundState(skier);
-  judgeStunt(skier, events);
+  judgeLanding(skier, airSeconds, events);
   judgeImpact(skier, Math.max(0, impact), events, 'landing');
   events.push({ type: 'touchdown', impact: Math.max(0, impact), airSeconds, x: skier.x, y: skier.y });
   skier.airSeconds = 0;
 }
 
+const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+
 /**
- * After a stunt, compare the body with the slope. Whole turns count as
- * flips; what is left over is how far off the landing is.
+ * Judge a touchdown by heading: the body's turn about the vertical axis
+ * against the direction of travel. Forward is forgiving, backwards (switch)
+ * is narrow, sideways is a crash. Whole half turns count as rotation.
  */
-function judgeStunt(skier, events) {
+function judgeLanding(skier, airSeconds, events) {
   const spin = skier.spin;
   skier.spin = 0;
   skier.spinRate = 0;
-  if (Math.abs(spin) < 0.05 || skier.crashed) return;
-  const turns = Math.round(spin / (2 * Math.PI));
-  const offBy = spin - turns * 2 * Math.PI;
-  const miss = Math.abs(offBy);
-  if (miss > PHYSICS.trickCrashAngle) {
+  if (skier.crashed) return;
+  const heading = wrapAngle((skier.switchStance ? Math.PI : 0) + spin);
+  const offForward = Math.abs(heading);
+  const offBackward = Math.PI - offForward;
+  let clean;
+  if (offForward <= PHYSICS.forwardSafeAngle) {
+    skier.switchStance = false;
+    clean = offForward <= PHYSICS.forwardCleanAngle;
+  } else if (offBackward <= PHYSICS.switchSafeAngle) {
+    if (airSeconds > PHYSICS.switchMaxAirSeconds) {
+      skier.crashed = true;
+      events.push({ type: 'crash', impact: 0, kind: 'switch-big-air', x: skier.x, y: skier.y });
+      return;
+    }
+    const wasSwitch = skier.switchStance;
+    skier.switchStance = true;
+    clean = offBackward <= PHYSICS.switchCleanAngle;
+    if (!wasSwitch) events.push({ type: 'switch', x: skier.x, y: skier.y });
+  } else {
     skier.crashed = true;
-    events.push({ type: 'crash', impact: 0, kind: offBy > 0 ? 'over-rotated' : 'under-rotated', x: skier.x, y: skier.y });
+    events.push({ type: 'crash', impact: 0, kind: 'sideways', x: skier.x, y: skier.y });
     return;
   }
-  if (miss > PHYSICS.trickSketchyAngle) {
-    events.push({ type: 'hard', impact: PHYSICS.softLandingSpeed + miss * 10, kind: 'sketchy', x: skier.x, y: skier.y });
-  }
-  if (turns >= 1) events.push({ type: 'trick', flips: turns, clean: miss <= PHYSICS.trickSketchyAngle, x: skier.x, y: skier.y });
+  if (!clean) events.push({ type: 'hard', impact: PHYSICS.softLandingSpeed + 2, kind: 'sketchy', x: skier.x, y: skier.y });
+  const halfTurns = Math.round(Math.abs(spin) / Math.PI);
+  if (halfTurns >= 1) events.push({ type: 'trick', degrees: halfTurns * 180, clean, x: skier.x, y: skier.y });
 }
 
 function spinInAir(skier, controls, dt) {

@@ -4,7 +4,8 @@ Design ski runs with maths, then watch real physics ride them.
 
 Every track is the graph of `y = f(x)` over an x range, or a line you sketch.
 Press **Ride** and a skier takes it on, and you can pop, tuck, brake and
-flip: gravity along the slope, snow
+spin (180s, 360s and more: land facing forward, or backwards on a small hop
+and ride switch with no brakes, but never sideways): gravity along the slope, snow
 friction, air drag, leaving the snow over crests when `v²κ > g·cosθ`, flying
 a parabola, and landing softly only when the hill matches the flight.
 
@@ -26,7 +27,7 @@ Works with mouse, keyboard, touch and pen, on phones and desktops.
 | Tuck (less drag) | ↓ or S | hold Tuck |
 | Brake (snowplough) | ← or A | hold Brake |
 | Pop off the snow | Space, ↑ or W | Pop |
-| Flip (hold in the air; let go to open up) | → or D | hold Flip |
+| Spin: pops, then turns while held; let go to slow the turn | → or D | hold Spin |
 | New Joyride slope | N | New slope |
 | Back to editing | R or Esc | ↺ |
 | Move, sketch, erase, start flag | V, D, E, S | tool bar |

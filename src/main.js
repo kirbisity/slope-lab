@@ -222,7 +222,7 @@ function startRide() {
   state.mode = 'ride';
   state.paused = false;
   state.particles = [];
-  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, brake: false, spin: 0, lostGear: false };
+  state.look = { tuck: 0, pitch: state.run.skier.pitch, tumble: 0, brake: false, yaw: 0, lostGear: false };
   state.accumulator = 0;
   state.gForce = 1;
   state.resultTimer = 0;
@@ -294,10 +294,9 @@ function physicsFrame(frameSeconds) {
   }
 }
 
-const FLIP_NAMES = ['Backflip', 'Double backflip', 'Triple backflip', 'Quad backflip'];
 const CRASH_MESSAGES = {
-  'over-rotated': 'Over-rotated! Let go of Flip sooner',
-  'under-rotated': 'Under-rotated! Hold Flip longer, or pop higher',
+  sideways: 'Landed sideways! Finish the turn, or stop at 180',
+  'switch-big-air': 'Too much air to land backwards',
 };
 
 function handleRunEvent(event) {
@@ -326,8 +325,11 @@ function handleRunEvent(event) {
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * event.impact);
       break;
     case 'trick':
-      toast(`${FLIP_NAMES[Math.min(event.flips, FLIP_NAMES.length) - 1]}! +${event.flips * SCORING.flipJoy} joy`, 'good');
-      playChime(state.audio, [990, 1320, 1760].slice(0, 1 + Math.min(2, event.flips)));
+      toast(`${run.skier.switchStance ? 'Switch ' : ''}${event.degrees}! +${(event.degrees / 180) * SCORING.joyPerHalfTurn} joy`, event.clean ? 'good' : 'warn');
+      playChime(state.audio, [990, 1320, 1760].slice(0, Math.min(3, event.degrees / 180)));
+      break;
+    case 'switch':
+      toast('Riding backwards: no brakes, and no big landings', 'warn');
       break;
     case 'token':
       toast(`Snowflake ${run.collected.size} of ${run.course.tokens.length}`, 'good');
@@ -504,9 +506,10 @@ function updateLook(dt) {
   const controls = currentControls();
   const look = state.look;
   look.tuck += ((controls.tuck || (controls.trick && run.skier.mode === 'air') ? 1 : 0) - look.tuck) * Math.min(1, dt * 10);
-  look.spin = run.skier.spin;
+  // Heading about the vertical axis: half a turn when riding backwards.
+  look.yaw = (run.skier.switchStance ? Math.PI : 0) + run.skier.spin;
   look.lostGear = run.skier.crashed;
-  look.brake = controls.brake && run.skier.mode === 'ground';
+  look.brake = controls.brake && run.skier.mode === 'ground' && !run.skier.switchStance;
   const difference = Math.atan2(Math.sin(run.skier.pitch - look.pitch), Math.cos(run.skier.pitch - look.pitch));
   look.pitch += difference * Math.min(1, dt * 18);
   if (run.skier.crashed) look.tumble += dt * Math.max(0, 9 - run.crashSeconds * 3);
@@ -581,7 +584,7 @@ function updateReadout(dt) {
   const g = skier.mode === 'ground' ? skier.normalAccel / PHYSICS.gravity : 0;
   state.gForce += (g - state.gForce) * Math.min(1, dt * 8);
   setText('gauge-g', `${state.gForce.toFixed(1)} g`);
-  const turned = skier.mode === 'air' && Math.abs(skier.spin) > 0.05 ? ` · ${Math.round((skier.spin * 180) / Math.PI)}°` : '';
+  const turned = skier.mode === 'air' && Math.abs(skier.spin) > 0.05 ? ` · ${Math.round((skier.spin * 180) / Math.PI)}°` : skier.switchStance ? ' · switch' : '';
   setText('gauge-air', `${(skier.mode === 'air' ? skier.airSeconds : 0).toFixed(1)} s${turned}`);
 }
 
@@ -1105,7 +1108,12 @@ window.addEventListener('keydown', (event) => {
     if (key === 'arrowdown' || key === 's') { state.keys.tuck = true; event.preventDefault(); }
     if (key === 'arrowleft' || key === 'a') { state.keys.brake = true; event.preventDefault(); }
     if ((key === ' ' || key === 'arrowup' || key === 'w') && !event.repeat) { state.jumpBufferSeconds = 0.15; event.preventDefault(); }
-    if (key === 'arrowright' || key === 'd') { state.keys.trick = true; event.preventDefault(); }
+    if (key === 'arrowright' || key === 'd') {
+      // Spin pressed on the snow pops first, so one press chains both.
+      if (!event.repeat) state.jumpBufferSeconds = 0.15;
+      state.keys.trick = true;
+      event.preventDefault();
+    }
     if (key === 'n' && isJoyride()) newJoyride();
     if (key === 'p') togglePause();
     if (key === 'r') backToEdit();
@@ -1228,6 +1236,7 @@ for (const button of document.querySelectorAll('.hold')) {
     button.classList.add('active');
     if (control === 'jump') state.jumpBufferSeconds = 0.15;
     else state.touch[control] = true;
+    if (control === 'trick') state.jumpBufferSeconds = 0.15;
   };
   const releaseHold = () => {
     button.classList.remove('active');

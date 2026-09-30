@@ -396,16 +396,46 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
   ctx.globalAlpha = alpha;
   ctx.translate(feet.x, feet.y);
   ctx.scale(skier.facing, 1);
-  ctx.rotate(-look.pitch);
+  // Heading about the vertical axis. A point `along` the ski and `across`
+  // it sits at along·cos(yaw) − across·sin(yaw) down the slope and at depth
+  // along·sin(yaw) + across·cos(yaw). Slope distance follows the pitch;
+  // depth rises straight up the screen, exactly as the snow lane does.
+  const yaw = look.yaw || 0;
+  const cosYaw = Math.cos(yaw);
+  const sinYaw = Math.sin(yaw);
+  const pitch = look.pitch;
+  const geared = !look.lostGear;
+  if (geared) {
+    ctx.save();
+    ctx.scale(scale, -scale);
+    const skiPoint = (along, across, lift = 0) => {
+      const down = along * cosYaw - across * sinYaw;
+      const depth = along * sinYaw + across * cosYaw;
+      return [down * Math.cos(pitch) - (0.02 + lift) * Math.sin(pitch), down * Math.sin(pitch) + (0.02 + lift) * Math.cos(pitch) + depth * VIEW.depthLift];
+    };
+    const drawSki = (across, color) => {
+      const tail = skiPoint(-0.85, across);
+      const bend = skiPoint(0.8, across);
+      const tip = skiPoint(1.02, across, 0.12);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(tail[0], tail[1]);
+      ctx.lineTo(bend[0], bend[1]);
+      ctx.lineTo(tip[0], tip[1]);
+      ctx.stroke();
+    };
+    // The ski further from the camera goes down first.
+    const farSide = cosYaw >= 0 ? 0.11 : -0.11;
+    drawSki(farSide, palette.farSki);
+    drawSki(-farSide, palette.jacket);
+    ctx.restore();
+  }
+  ctx.rotate(-pitch);
   if (skier.crashed) ctx.rotate(-look.tumble);
   ctx.scale(scale, -scale);
 
-  if (look.spin) {
-    // Somersaults turn about the hips, not the feet.
-    ctx.translate(0, -0.9 * scale);
-    ctx.rotate(-look.spin);
-    ctx.translate(0, 0.9 * scale);
-  }
   const base = skier.mode === 'air' ? POSES.air : POSES.upright;
   const target = look.brake ? POSES.brake : base;
   const pose = {};
@@ -419,23 +449,13 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Far ski and leg first, slightly offset, darker: a cheap depth cue.
-  const drawSki = (offsetX, offsetY, color) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 0.07;
-    ctx.beginPath();
-    ctx.moveTo(-0.85 + offsetX, 0.02 + offsetY);
-    ctx.lineTo(0.8 + offsetX, 0.02 + offsetY);
-    ctx.quadraticCurveTo(0.98 + offsetX, 0.02 + offsetY, 1.02 + offsetX, 0.14 + offsetY);
-    ctx.stroke();
-  };
-  const geared = !look.lostGear;
-  if (geared) drawSki(0.06, 0.05, palette.farSki);
+  // The body turns with the skis: mirrored past 90°, foreshortened near it.
+  ctx.save();
+  ctx.scale((cosYaw >= 0 ? 1 : -1) * Math.max(0.38, Math.abs(cosYaw)), 1);
   line([0.06, 0.12], [pose.knee[0] + 0.05, pose.knee[1] + 0.03], 0.17, palette.farLeg);
   line([pose.knee[0] + 0.05, pose.knee[1] + 0.03], [pose.hip[0] + 0.03, pose.hip[1]], 0.19, palette.farLeg);
   if (geared) line(pose.shoulder, [pose.poleTip[0] + 0.05, pose.poleTip[1] + 0.02], 0.025, palette.pole);
 
-  if (geared) drawSki(0, 0, palette.jacket);
   line([0, 0.12], pose.knee, 0.18, palette.pants);
   line(pose.knee, pose.hip, 0.2, palette.pants);
   ctx.fillStyle = palette.farLeg;
@@ -458,6 +478,7 @@ function drawSkier(ctx, camera, skier, look, palette = SKIER_PALETTE, alpha = 1)
     ctx.fillStyle = '#3b2a20';
     ctx.beginPath(); ctx.arc(pose.head[0] - 0.02, pose.head[1] + 0.03, 0.12, Math.PI * 0.05, Math.PI * 1.05); ctx.fill();
   }
+  ctx.restore();
   ctx.restore();
 }
 

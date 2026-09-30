@@ -108,6 +108,11 @@ function launch(skier, segment, events, reason) {
   const nx = -segment.ty * skier.side;
   const ny = segment.tx * skier.side;
   skier.mode = 'air';
+  // Leaving the snow with the skis across the way of travel catches an edge.
+  if (skier.hockey >= PHYSICS.hockeyLoadedShare && !skier.crashed) {
+    skier.crashed = true;
+    events.push({ type: 'crash', impact: 0, kind: 'edge', x: skier.x, y: skier.y });
+  }
   skier.hockey = 0;
   skier.vx = segment.tx * skier.speed;
   skier.vy = segment.ty * skier.speed;
@@ -127,7 +132,8 @@ function launch(skier, segment, events, reason) {
 }
 
 function judgeImpact(skier, impactSpeed, events, kind) {
-  if (impactSpeed > PHYSICS.crashLandingSpeed && !skier.crashed) {
+  const crashSpeed = kind === 'landing' && skier.switchStance ? PHYSICS.switchCrashLandingSpeed : PHYSICS.crashLandingSpeed;
+  if (impactSpeed > crashSpeed && !skier.crashed) {
     skier.crashed = true;
     events.push({ type: 'crash', impact: impactSpeed, kind, x: skier.x, y: skier.y });
   } else if (impactSpeed > PHYSICS.softLandingSpeed) {
@@ -256,7 +262,9 @@ function stepGround(skier, surfaces, controls, dt, events) {
   }
 
   turnForHockeyStop(skier, controls, dt);
-  if (skier.hockey >= 1 && hockeyStopLoad(Math.abs(skier.speed), -skier.pitch) > 1) {
+  const pressureChange = Math.abs(skier.curveAccel) / g;
+  const loadedAcross = skier.hockey >= PHYSICS.hockeyLoadedShare && pressureChange > PHYSICS.hockeyLoadTolerance;
+  if (!skier.crashed && (loadedAcross || (skier.hockey >= 1 && hockeyStopLoad(Math.abs(skier.speed), -skier.pitch) > 1))) {
     skier.crashed = true;
     events.push({ type: 'crash', impact: 0, kind: 'edge', x: skier.x, y: skier.y });
   }

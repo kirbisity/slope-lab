@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<script src='https://code.jquery.com/jquery-1.11.0.min.js'></script>
+<script src='https://code.jquery.com/ui/1.11.1/jquery-ui.min.js'></script>
+<link rel='stylesheet' href='https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<head>
+    <meta content='text/html;charset=utf-8' http-equiv='Content-Type'>
+    <meta content='utf-8' http-equiv='encoding'>
+    <title>Skateboarding - The JavaScript Skateboarding Simulator</title>
+    <link rel='stylesheet' type='text/css' href='skateboarding.css' />
+
+    <script>
+     
+    </script>
+</head>
+    
+<body>
+<div>
+    <div id='loginDialog' class = 'loginpopup' title='Login'>
+      <h1> User Name: </h1>
+      <input id = 'loginusername' class = 'input login' type='text' name='username'/>
+      <br/>
+      <h1> Password: </h1>
+      <input id = 'loginpassword' class = 'input login' type='password' name='password'/>
+    </div>
+
+    <div id='viewoverlay'></div>
+    <div id='canvasesdiv'>
+        <canvas id='background'>
+        This text is displayed if your browser does not support HTML5 Canvas.
+        </canvas>
+    
+        <canvas id='canvas1'>
+        This text is displayed if your browser does not support HTML5 Canvas.
+        </canvas>
+    </div>
+	<div id='leftMenu'>
+	    <div class='dropdown'>
+            <button id='save' class='button menu1 dropbtn'; title='Save the game'; onclick='saveGameButton();'></button>
+            <div id='saveGameMenu' class='dropdown-content menu'>
+				<a onclick='saveGameLocal()'>↓ Save Locally</a>
+                <a onclick='saveGameCloud()'>↓ Save To Cloud</a>
+            </div>
+        </div>
+		<div class='dropdown'>
+            <button id='load' class='button menu1 dropbtn'; title='Load the game'; onclick='loadGameButton();'></button>
+            <div id='loadGameMenu' class='dropdown-content menu'>
+                <a onclick="document.getElementById('loadlocal').click();">↑ Load Local File</a>
+				<a id='loadcloud'; onclick='loadGameCloud()'>↑ Load From Cloud</a>
+            </div>
+        </div>
+        <button id='draw' class='button menu1'; title='Draw the Trails by Hand!'; onclick='drawTrailButton();'></button>
+        <button id='erase' class='button menu1'; title='Delete All Tracks'; onclick='eraseTrailButton();'></button>
+		<button id='reset' class='button menu1'; title='Reset Starting Location'; onclick='reset();'></button>
+		<button id='zoom' class='button menu1'; title='Zoom the view'; onclick='zoomButton();'></button>
+		<div id= 'penbarb' class='bar'>pen</div>
+		<div id= 'penbara' class='bar'></div>
+	</div>
+	
+    <div id='topMenu'>
+        <div id="fps">fps</div>
+        <button id='start' class='button menu'; title='Start/Pause the Simulation'; onclick='start();'></button>
+        <button id='restart' class='button menu'; title='Restart the Simulation'; onclick='restartButton();'></button>
+
+		<div id = 'joyboard' class='scoreboard'>
+			<h1>Joy</h1>
+			<button class='button score'; id ='joyBtn'; onclick='displayInfo(infoJoy);';>0</button>
+		</div>
+		<div id = 'ouchboard' class='scoreboard'>
+			<h1>Ouch</h1>
+			<button class='button score'; id ='ouchBtn'; onclick='displayInfo(infoOuch);';>0</button>
+		</div>
+		
+        <button id='login' class='button menu'; title='User Login'; onclick='userLogin();'></button>
+        <button id='help' class='button menu'; title='More information'; onclick='displayHelp();'></button>   
+    </div>
+	
+    <div id='sideMenu'>
+		<button id='closeSideMenu' class='button menu'; onclick='hideSideMenu();'>></button>
+        <input id='equationInput' class='input equation'; type='text' name='equationInput' placeholder='Enter y=f(x)'>
+        <h1>X start: </h1>
+        <input id='equationStartX' class='input equation'; type='text' name='equationStartX' placeholder='Start'>
+        <h2>X end: </h2>
+        <input id='equationEndX' class='input equation';type='text' name='equationEndX' placeholder='End'>
+        <button id='editGraph' class='button td round'; onclick='editGraph();'></button>
+        <button id='drawGraph' class='button td round'; onclick='drawGraphBtn();'></button>
+        
+        <div class='dropdown'>
+            <button id='sampleBtn' onclick='clickSample()' class='button td dropbtn'></button>
+            <div id='sampleEquation' class='dropdown-content'>
+                <a onclick='listSampleBtn(0)'>2</a>
+                <a onclick='listSampleBtn(1)'>y=-0.5x</a>
+                <a onclick='listSampleBtn(2)'>y=-0.3x-2</a>
+                <a onclick='listSampleBtn(3)'>y=0.1x^2</a>
+                <a onclick='listSampleBtn(4)'>y=0.05*(x+5)^2</a>
+				<a onclick='listSampleBtn(5)'>y=sin(0.5x)-0.2x</a>
+				<a onclick='listSampleBtn(6)'>y=-3*log(0.1x+0.1)+0.4x-6</a>
+            </div>
+        </div>
+		<h3 id='coordinates'>x: 0 y: 0</h3>
+		<div id='equationList'>
+		</div>
+    </div>
+	
+    <!-- The Modal -->
+    <div id='helpPop' class='modal'>
+
+      <!-- Modal content -->
+      <div class='modal-content'>
+        <div class='modal-header'>
+          <span class='closehelp'>&times;</span>
+          <h2>Skateboarding APP</h2>
+        </div>
+        <div class='modal-body'>
+          <p>To create a skateboarding path, select an equation from the list, or write your own. Then press Draw.</p>
+		  <p>You can use +, -, *, /, (), ^, sin, cos, tan, log, sqrt to draw the graph</p>
+          <p>To watch it ride your path, press Play</p>
+		  <p>You can reposition the start location of the skateboarder by pressing the flag button at top</p>
+		  <p>You can also selectively erase paths with the erase button at top.</p>
+        </div>
+      </div>
+    </div>
+	
+	<div class='speedometer' style='text-align:center'  onclick='changeSpeedometerUnit()'>
+		<svg viewbox='0 0.5 10 8' id='speedometerring'>
+			<path d='M2 8 A 4 4 0 1 1 8 8' fill='none' stroke-width='0.78' stroke='#a4a4a4' />
+			<path id='speedometerringbar' class='loader' d='M2 8 A 4 4 0 1 1 8 8' fill='none' stroke-width='0.8' stroke='#ff6600' />
+		</svg>
+		<h1 id='speedometertext'>0</h1>
+		<h2 id='speedometertext1'>m/s</h2>
+	</div>
+	
+	<div id='gameInfo' class='modal infomodal'>
+	  <div id='infocont' class='modal-content infomodal-content'>
+		<span class='close' onclick='closeInfo();'>&times;</span>
+		<p id='infoP'>...</p>
+	  </div>
+	</div>
+	
+    <a><input id='loadlocal' type='file'></a>
+	<script>
+	let infoJoy = 'Joy is measured by speed and airtime.';
+	let infoOuch = 'Ouch is measured by the number of hard landings';
+	</script>
+    <script src='saveToCloud.js'></script>
+    <script src='skateboarding.js'></script>
+    
+</div>
+</body>
+</html>

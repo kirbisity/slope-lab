@@ -1,0 +1,796 @@
+@import url('https://fonts.googleapis.com/css?family=Lato:300|Electrolize');
+
+body {
+	font-family: "Lato";
+	font-size: 9pt;
+	-webkit-user-select: none;
+     -moz-user-select: -moz-none;
+      -ms-user-select: none;
+          user-select: none;
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+}
+#wrapper { position: absolute; top: 0px; left: 0px; height: 100%; width: 100%;overflow: hidden;}
+
+#viewoverlay{
+	position: fixed;
+	left: 0px;
+    top: 0px;
+	width: 100%;
+	height: 100%;
+	background: radial-gradient(circle, rgba(0, 0, 0, 0) 40%, rgba(80, 0, 0, 0.8));
+	opacity: 0;
+	z-index: 4;
+}
+
+#background{
+	position:absolute;
+    left:70px;
+    top:0px;
+	z-index: 1;
+}   
+
+#canvas1{
+	position:absolute;
+    left:70px;
+    top:0px;
+	z-index: 2;
+}
+
+#leftMenu {
+	border-style: solid;
+    border-width: 1px;
+	border-color: #999;
+	background: rgb(220,220,220);
+    position: absolute;
+    width: 68px;
+    height: 100%;
+    top: 0px;
+    left:0px;
+    z-index: 5;
+}
+
+#topMenu {
+	border-style: solid;
+    border-width: 1px;
+	border-color: #999;
+	background-color:#555;
+    position: absolute;
+    width: 100%;
+    height: 70px;
+    top: 0px;
+    left:0px;
+    z-index: 6;
+}
+
+#sideMenu {
+	border-style: solid;
+    border-width: 1px;
+	border-color: #999;
+	background: rgba(220,220,220,1);
+    position: absolute;
+    width: 270px;
+    height: calc(100% - 70px);
+    top: 70px;
+    right:0px;
+	-webkit-transition-duration: 0.5s;
+	transition-duration: 0.5s;
+    z-index: 5;
+}
+#sideMenu h1 {
+	color: #666;
+
+	text-align: left;
+	white-space:pre;
+	position: absolute;
+	font-size: 18px;
+	left: 30px;
+	top : 167px;
+}
+
+#sideMenu h2 {
+	color: #666;
+
+	text-align: center;
+	white-space:pre;
+	position: absolute;
+	font-size: 18px;
+	left: 30px;
+	top : 224px;
+}
+
+#sideMenu h3 {
+	text-align: center;
+	white-space:pre;
+	position: absolute;
+	font-size: 18px;
+	width: 230px;
+}
+
+#coordinates {
+	bottom: 30px;
+}
+
+.scoreboard {
+	text-align: center;
+	position: absolute;
+	color: #EEE;
+	text-shadow: none;
+	line-height: 5px;
+}
+.scoreboard h1 {
+	font-size: 20px;
+}
+
+#joyboard {
+	left: calc(100% - 400px);
+}
+#ouchboard {
+	left: calc(100% - 330px);
+}
+.bar{
+	font-size: 14px;
+	text-align: center;
+	font-family: 'Electrolize', sans-serif;
+	color:#fff;
+	font-weight: bold;
+	line-height: 150px;  
+	border-radius: 17px;
+	background:#transparent;
+	width: 30px;
+	height: 150px; 
+}
+#penbarb{
+	border: 4px solid #999;
+	position:absolute;
+	width: 26px;
+	height: 144px;
+	left: 17px;
+	bottom: 50px;
+	z-index: 7;
+}
+#penbara{
+	background: #ff899f;
+	position:absolute;
+	width:30px;
+	left: 19px;
+	bottom: 52px;
+	z-index: 6;
+}
+
+.button.menu1 {
+		color: #FFF;
+		border: 3px;
+		background: #999;
+		border-radius: 4px;
+		padding: 1px 4px;
+		width: 50px;
+		height: 50px;   
+		font-size: 11px;
+		font-family: Lato;
+		position: relative;
+		-webkit-transition-duration: 0.2s;
+		transition-duration: 0.2s;
+		background-position: center;
+		background-attachment: relative;
+		background-repeat: no-repeat;
+		background-size: 80% 80%;
+		z-index: 8;
+		top: 80px;
+		left: 10px;
+		margin-top: 10px;
+	}
+	.button.menu1:hover {
+		background: #666;
+		-webkit-transition-duration: 0.2s;
+		transition-duration: 0.2s;
+		background-position: center;
+		background-attachment: relative;
+		background-repeat: no-repeat;
+		background-size: 80% 80%;
+		left: 12px;
+	}
+
+	.button.menu1:focus {
+		outline:0;
+	}
+
+	.button.menu1.selected {
+		background-color: #9fe427;
+	}
+
+	#draw {
+		background-image: url("images/drawBtn.png");
+	}
+	#erase {
+		background-image: url("images/eraseBtn.png");
+	}
+	#zoom {
+		background-image: url("images/zoomBtn.png");
+	}
+	#move {
+		background-image: url("images/moveBtn.png");
+	}
+	#reset {
+		background-image: url("images/resetBtn.png");
+	}
+	#load {
+		background-image: url("images/loadBtn.png");
+	}
+	#save {
+		background-image: url("images/saveBtn.png");
+	}
+
+
+.button.menu {
+		color: #FFF;
+		border: 0px;
+		background: transparent;
+		border-radius: 4px;
+		padding: 1px 4px;
+		width: 50px;
+		height: 50px;   
+		font-size: 11px;
+		font-family: Lato;
+		position: absolute;
+		-webkit-transition-duration: 0.2s;
+		transition-duration: 0.2s;
+		background-position: center;
+		background-attachment: relative;
+		background-repeat: no-repeat;
+		background-size: 80% 80%;
+		z-index: 8;
+		top: 10px;
+	}
+	.button.menu:hover {
+		background-size: 90% 90%;
+		opacity: 0.35;
+		top: 12px;
+	}
+
+	.button.menu:focus {
+		outline:0;
+	}
+
+	.button.menu.selected {
+		background-color: #9fe427;
+	}
+	#start {
+		background-image: url("images/startBtn.png");
+		left: calc(47% - 35px);
+	}
+	#restart {
+		background-image: url("images/restartBtn.png");
+		left: calc(47% + 35px);
+	}
+	#login {
+		background-image: url("images/loginBtn.png");
+		left: calc(100% - 170px);
+	}
+
+	#help {
+		background-image: url("images/helpBtn.png");
+		left: calc(100% - 100px);
+	}
+	#closeSideMenu {
+		font-size: 25px;
+		font-weight: bold;
+		text-shadow: 0px -1px 1px #bdb5b4, 1px 1px 1px white;
+		color: #222;
+		-webkit-box-shadow: 0px 0px 6px 1px rgba(0,0,0,0.4);
+		-moz-box-shadow:    0px 0px 6px 1px rgba(0,0,0,0.4);
+		box-shadow:         0px 0px 6px 1px rgba(0,0,0,0.4);
+		box-shadow:         0px 0px 6px 1px rgba(0,0,0,0.4);
+		border: 2px;
+		background: linear-gradient(to right, #DDD, #CCC);
+		top: calc(50% - 65px);
+		left: 1px;
+		width: 25px;
+		height: 130px;   
+	}
+	#closeSideMenu:hover {
+		opacity: 1;
+		background: linear-gradient(to right, #CCC, #DDD);
+	}
+
+.button.td{
+		background: -webkit-linear-gradient(top, #f4f1ee, #fff);
+		background: linear-gradient(top, #f4f1ee, #fff);
+		box-shadow: 0px 8px 10px 0px rgba(0, 0, 0, .3), inset 0px 4px 1px 1px white, inset 0px -3px 1px 1px rgba(204,198,197,.5);
+		margin: 0 30px 30px 0;
+		position: absolute;
+		-webkit-transition: all .2s linear;
+		transition: all .2s linear;
+		border: 0px;
+		z-index: 10;
+	}
+	.button.td.round{
+		height: 44px;
+		width: 64px;
+		border-radius: 10%;
+	}
+	.button.td.dropbtn{
+		height: 60px;
+		width: 211px;
+		border-radius: 20%;
+	}
+	.button.td:after{
+		color:#99aa99;
+		content: "";
+		display: block;
+		font-size: 20px;
+		height: 30px;
+		text-decoration: none;
+		text-shadow: 0px -1px 1px #bdb5b4, 1px 1px 1px white;
+		position: absolute;
+		width: 30px;
+	}
+	
+	#sampleBtn:after{
+		content: 'Sample Equations';
+		white-space: nowrap;
+		font-size: 22px;
+		left: 16px;
+		top: 17px;
+	}
+
+	#editGraph:after{
+		font-size: 16px;
+		content: 're-draw';
+		white-space: nowrap;
+		left: 6px;
+		top: 14px;
+	}
+	
+	#drawGraph:after{
+		content: 'Draw';
+		left: 10px;
+		top: 11px;
+	}
+	.button.td:hover{
+		background-image: -webkit-linear-gradient(top, #fff, #f4f1ee);
+		background-image: linear-gradient(top, #fff, #f4f1ee);
+		color:#0088cc;
+	}
+	#editGraph:hover:after{
+		opacity: 1;
+		color:#f94e66;
+		text-shadow:0px 0px 6px #f94e66;
+	}
+	#drawGraph:hover:after{
+		opacity: 1;
+		color:#f94e66;
+		text-shadow:0px 0px 6px #f94e66;
+	}
+	#sampleBtn:hover:after{
+		opacity: 1;
+		color:#f94e66;
+		text-shadow:0px 0px 6px #f94e66;
+	}
+	.button.td:active{
+		background-image: -webkit-linear-gradient(top, #efedec, #f7f4f4);
+		background-image: linear-gradient(top, #efedec, #f7f4f4);
+		box-shadow: 0 3px 5px 0 rgba(0,0,0,.4), inset 0px -3px 1px 1px rgba(204,198,197,.5);
+	}
+		
+	.button.td:active:after{
+		color:#dbd2d2;
+		text-shadow: 0px -1px 1px #bdb5b4, 0px 1px 1px white;
+	}
+	.button.td:focus{
+		outline:0;
+	}
+
+.button.score {
+	color: #ff6600;
+	width: 60px;
+	height: 30px;
+	background: #616161;
+	border: 2px solid #EEE;
+	border-radius: 15px;
+	line-height:14px;
+	font-size: 18px;
+	font-family: 'Electrolize', sans-serif;
+	padding: 7px 0px;
+	font-weight: bold;
+	margin: 0px 0;
+	margin-right: 0px;
+	display: inline-block;
+	text-decoration: none;
+}
+.button.score:hover {
+	background: #6f6f6f;
+}
+.button.score:focus {
+	outline:0;
+}
+
+#editGraph {
+    left: 177px;
+    top: 171px;
+}
+
+#drawGraph {
+    left: 177px;
+    top: 231px;
+}
+
+
+.input.equation {  
+    font-size: 16px;
+    position: absolute;
+	color: #666;
+    border: 2px solid #999;
+    background: #dbedd2;
+    border-radius: 1px;
+    padding: 1px 4px;
+	width: 200px;
+    height: 40px; 
+    z-index: 9;
+}
+.input.equation:focus {
+	font-size: 18px;
+    letter-spacing: 1px;
+    font-weight: bolder;
+    outline:0;
+    color: #000;
+}
+
+#equationInput {
+	font-family: Courier New;
+	font-weight: bold;
+	letter-spacing: 2px;
+    left: 30px;
+    top: 110px;
+}
+
+#equationStartX {
+	font-family: Courier New;
+	font-weight: bold;
+	letter-spacing: 3px;
+    left: 90px;
+    top: 170px;
+	width: 60px;
+}
+
+#equationEndX {
+	font-family: Courier New;
+	font-weight: bold;
+	letter-spacing: 3px;
+    left: 90px;
+    top: 270px;
+    top: 230px;
+	width: 60px;
+}
+
+#sampleBtn {
+	border-radius: 0;
+	left: 30px;
+    top: 30px;
+}
+
+#sampleEquation {
+	left: 29px;
+	top: 87px;
+	width: 214px;
+}
+#loadGameMenu {
+	left: 69px;
+	top: 192px;
+	width: 252px;
+}
+#saveGameMenu {
+	left: 69px;
+	top: 70px;
+	width: 252px;
+}
+
+#loadlocal{
+	display: none;
+}
+
+.dropdown-content {
+    display: none;
+    position: relative;
+    background-color: #777;
+    min-width: 160px;
+    overflow: auto;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+.dropdown-content a {
+	font-family: Lato;
+	font-weight: bold;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+	letter-spacing: 3px;
+    color: #000;
+    border: 2px solid #999;
+    background: #FFF;
+    font-size: 16px;
+}
+.dropdown-content.menu{
+	position: absolute;
+}
+.dropdown-content.menu a {
+    padding: 16px 10px;
+    text-decoration: none;
+    display: block;
+	letter-spacing: 3px;
+    color: #555;
+    border: 2px solid #999;
+    background: linear-gradient(#DDD, #CCC);
+    font-size: 20px;
+	font-weight: bold;
+}
+
+.dropdown a:hover {
+	background: linear-gradient(#BBB, #CCC);
+}
+
+.show {display:block;}
+
+#logopng {
+	position: absolute;
+	left: 0px;
+	left: 10px;
+	top: calc(100% - 110px);
+}
+
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    padding-top: 100px; /* Location of the box */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+	z-index: 11;
+}
+
+/* Modal Content */
+.modal-content {
+	text-align: center;
+    position: relative;
+    background: linear-gradient(#eee, #ccc);
+	font-size: 24px;
+	font-weight:bold;
+	color: #444;
+	text-shadow: 0px -0.5px 0.5px #bdb5b4, 1px 1px 1px white;
+    letter-spacing: 1px;
+    margin: auto;
+    padding: 0;
+    border: 20px solid #888;
+	border-radius: 50px;
+    width: 60%;
+    box-shadow: 0 6px 10px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: 0.4s;
+    animation-name: animatetop;
+    animation-duration: 0.4s
+}
+
+/* Add Animation */
+@-webkit-keyframes animatetop {
+    from {top:-300px; opacity:0} 
+    to {top:0; opacity:1}
+}
+
+@keyframes animatetop {
+    from {top:-300px; opacity:0}
+    to {top:0; opacity:1}
+}
+
+/* The Closehelp Button */
+.closehelp {
+	top:0px;
+    color: white;
+    float: right;
+    font-size: calc(55px);
+    font-weight: bold;
+}
+
+.closehelp:hover,
+.closehelp:focus {
+    color: #ff0000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.modal-header {
+	border-radius: 30px;
+	font-size: 16px;
+    padding: 2px 16px;
+    background-color: #546899;
+    color: white;
+}
+
+.modal-body {
+	padding: 2px 16px;
+}
+
+
+.modal.infomodal {
+    background-color: transparent; /* Black w/ opacity */
+}
+.modal-content.infomodal-content {
+    background: linear-gradient(#7ae1ff, #6ebbf1);
+    margin-left: 42%;
+	margin-top: 0%;
+    padding: 0.5vw;
+    border: 20px solid #888;
+	border-color: #DEDEDE;
+	border-radius: 35px;
+    width: 25%;
+	height: 20%;
+	font-size: calc(1vw + 8px);
+	color: #fff;
+	text-shadow: 0px -1px 1px rgba(0,0,0,.6), 1px 1px 1px rgba(255,255,255,.6);
+	box-shadow: 0 1px 0 #ccc,
+               0 2px 0 #c9c9c9,
+               0 3px 0 #bbb,
+               0 4px 0 #b9b9b9,
+               0 5px 0 #aaa,
+               0 6px 1px rgba(0,0,0,.1),
+               0 0 5px rgba(0,0,0,.1),
+               0 1px 3px rgba(0,0,0,.3),
+               0 3px 5px rgba(0,0,0,.2),
+               0 5px 10px rgba(0,0,0,.25),
+               0 10px 10px rgba(0,0,0,.2),
+               0 20px 20px rgba(0,0,0,.15);
+}
+
+.close {
+    color: #722431;
+    float: right;
+    font-size: calc(4vw + 8px);
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: #ff6f6f;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+
+svg {
+  display: block;
+  width: 100%;
+  margin: 0 auto;
+}
+.loader {
+	stroke-dasharray: 0 19 18;
+	transition: stroke-dasharray 0.1s linear;
+}
+svg:hover .loader {
+}
+.speedometer {
+	background: transparent;
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    bottom: 0px;
+    left: calc(100% - 260px);
+	top: 5px;
+	color:#ff6600;
+	-webkit-transition-duration: 0.5s;
+	transition-duration: 0.5s;
+	font-family: 'Electrolize', sans-serif;
+	text-shadow: none;
+    z-index: 6;
+}
+.speedometer:hover{
+	color:#FFF;
+}
+.speedometer h1 {
+	top: 3px;
+	left: 18px;
+	position: absolute;
+	text-align: center;
+	font-size: 22px;
+	
+}
+.speedometer h2 {
+	top: 28px;
+	left: 20px;
+	position: absolute;
+	text-align: center;
+	font-size: 14px;
+}
+
+
+
+#equationList {
+	position: absolute;
+	top: 330px;
+	left: 35px;
+}
+.button.equations {
+	color: #000;
+	text-shadow: 0px -0.5px 0.5px #bdb5b4, 1px 1px 1px white;
+	background: linear-gradient(#DDD, #BBB);
+	position: relative;
+	width: 200px;
+	height: 40px;
+	padding: 10px;
+	margin: 5px;
+	-webkit-transition: all .2s linear;
+		transition: all .2s linear;
+		border: 0px;
+	border-radius: 20px;
+	-webkit-box-shadow: 0px 5px 6px 0px rgba(0,0,0,0.4);
+	-moz-box-shadow:    0px 5px 6px 0px rgba(0,0,0,0.4);
+	box-shadow:         0px 5px 6px 0px rgba(0,0,0,0.4);
+	box-shadow:         0px 5px 6px 0px rgba(0,0,0,0.4);
+}
+.button.equations:hover {
+	color: #008aff;
+}
+.button.equations:focus {
+	margin-top:7px;
+	margin-bottom:3px;
+	-webkit-box-shadow: 0px 1px 3px 0px rgba(0,0,0,0.7);
+	-moz-box-shadow:    0px 1px 3px 0px rgba(0,0,0,0.7);
+	box-shadow:         0px 1px 3px 0px rgba(0,0,0,0.7);
+	outline:0;
+}
+.loginpopup {
+	border-radius: 8px;
+	font-size: 18px;
+	font-weight: bold;
+    width: 400px;
+    height: 250px;
+    z-index: 15;
+}
+.loginpopup h1 {
+	font-size: 18px;
+	line-height: 20px;
+}
+.Green {
+	z-index: 10;
+}
+.input.login {  
+    font-size: 16px;
+    position: absolute;
+	color: #666;
+    border: 2px solid #999;
+    background: #FFF;
+    border-radius: 8px;
+    padding: 1px 4px;
+	width: 200px;
+    height: 40px;
+	top: 10px;
+    z-index: 9;
+}
+.input.login:focus {
+	font-size: 18px;
+    letter-spacing: 1px;
+    font-weight: bolder;
+    outline:0;
+    color: #000;
+}
+#loginusername {
+	top: 18px;
+	left: 133px;
+}
+#loginpassword {
+	top: 82px;
+	left: 133px;
+}
+#fps {
+	font-size: 30px;
+	position: absolute;
+	top: 15px;
+	left: 50px;
+	z-index: 10;
+	color: #fff;
+}

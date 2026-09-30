@@ -503,13 +503,8 @@ export function skierPose(skier, look) {
   return pose;
 }
 
-// Heading about the vertical: the spin, plus a half turn when facing left.
-function headingOf(skier, look) {
-  return (look.yaw || 0) + (skier.facing < 0 ? Math.PI : 0);
-}
-
 function placedSkeleton(skier, look) {
-  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: headingOf(skier, look), flip: skier.flip || 0 });
+  return placeJoints(posedJoints(skierPose(skier, look)), { x: skier.x, y: skier.y, pitch: look.pitch, heading: look.yaw || 0, flip: skier.flip || 0, facing: skier.facing < 0 ? -1 : 1 });
 }
 
 /** The skeleton in the course plane, as a crash ragdoll starts from it. */

@@ -34,6 +34,8 @@ export function createSkier(start) {
     flipRate: 0,
     flipping: false,
     flipArmed: false,
+    flipForced: false,
+    flipGoal: 0,
     switchStance: false,
     flightLeft: Infinity,
     lookAheadClock: 0,
@@ -472,13 +474,21 @@ function rotate(skier, axis, dt) {
   const next = Math.floor(angle / step + 1e-9) * step + step;
   const reachable = (next - angle) / axis.tuckedRate + PHYSICS.landingSpareSeconds <= skier.flightLeft;
   // An armed trick starts as soon as a whole rotation fits in the air left,
-  // on this jump or a later one.
-  if (skier[axis.armed] && !skier[axis.active] && reachable) {
+  // on this jump or a later one. A flip tapped in the air starts at once,
+  // whether it fits or not.
+  const forced = axis.forced && skier[axis.forced];
+  if (skier[axis.armed] && !skier[axis.active] && (reachable || forced)) {
     skier[axis.armed] = false;
     skier[axis.active] = true;
+    if (axis.goal) skier[axis.goal] = next;
   }
+  if (axis.forced) skier[axis.forced] = false;
   if (skier[axis.active]) {
-    if (reachable) {
+    if (reachable && axis.goal) skier[axis.goal] = next;
+    // A committed rotation carries on to its goal even when the snow comes
+    // first: an under-rotated flip lands on the back.
+    const unfinished = axis.goal && angle < skier[axis.goal] - 1e-9;
+    if (reachable || unfinished) {
       skier[axis.rate] = axis.tuckedRate;
       skier[axis.angle] += axis.tuckedRate * dt;
       return;
@@ -516,6 +526,8 @@ function rotateInAir(skier, surfaces, controls, dt) {
     base: 0,
     tuckedRate: PHYSICS.flipRateTucked,
     step: 2 * Math.PI,
+    forced: 'flipForced',
+    goal: 'flipGoal',
     target: (pitch) => Math.round(pitch / (2 * Math.PI)) * 2 * Math.PI,
   }, dt);
 }
@@ -538,6 +550,7 @@ export function stepSkier(skier, surfaces, controls, dt = PHYSICS.stepSeconds) {
   if (!skier.crashed) {
     if (controls.trick) skier.spinArmed = true;
     if (controls.flip) skier.flipArmed = true;
+    if (controls.flip && skier.mode === 'air') skier.flipForced = true;
   } else {
     skier.spinArmed = false;
     skier.flipArmed = false;

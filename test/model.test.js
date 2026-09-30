@@ -26,6 +26,17 @@ test('placing the body: a half turn of heading mirrors it through the feet', () 
   assert.ok(quarter.skiDirection.z > 0.99, 'a quarter turn points the skis into the depth');
 });
 
+test('riding switch on a slope: the skis still lie along the slope', () => {
+  const slope = -0.3;
+  const along = { x: Math.cos(slope), y: Math.sin(slope) };
+  for (const [heading, facing] of [[0, 1], [Math.PI, 1], [0, -1], [Math.PI, -1]]) {
+    const ski = placeJoints(posedJoints(pose), { x: 0, y: 0, pitch: slope, heading, facing }).skiDirection;
+    // Leftwards travel mirrors the slope too.
+    const across = Math.abs(ski.x * along.y * facing - ski.y * along.x);
+    assert.ok(across < 1e-9, `heading ${heading.toFixed(2)}, facing ${facing}: skis off the slope by ${across}`);
+  }
+});
+
 test('every face of the model faces outward from its own part', () => {
   const placed = placeJoints(posedJoints(pose), { x: 0, y: 0, pitch: -0.3, heading: 0.4 });
   const faces = buildSkierMesh(placed, { gear: true });

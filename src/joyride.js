@@ -173,13 +173,13 @@ function buildCandidate(seed) {
     name: 'Joyride',
     difficulty: 'joyride',
     seed,
-    brief: 'A fresh slope every time. Just ride: tuck for speed, pop off the lips, hold Flip in the air, and let go in time to land.',
+    brief: 'A fresh slope every time. Just ride: tuck for speed, press Spin to pop and turn, and let go in time to land facing forward.',
     lesson: 'Every slope here is made of equations: rollers are 1 − cos humps, drops are half cosines, and each landing hill is the flight parabola y ≈ y₀ + (vy/vx)d − (g/2vx²)d², measured from a real takeoff.',
     start,
     pieces: course.pieces,
     finish: { x: finishX, yMin: finishY - 3, yMax: finishY + 5 },
     ink: 0,
-    stars: [{ type: 'finish' }, { type: 'minFlips', value: 1 }, { type: 'maxOuch', value: 0 }],
+    stars: [{ type: 'finish' }, { type: 'minRotation', value: 360 }, { type: 'maxOuch', value: 0 }],
   };
 }
 
@@ -187,7 +187,7 @@ function buildCandidate(seed) {
 export function validateJoyride(course) {
   const pieces = course.pieces.map((spec) => createEquationPiece(spec.equation, spec.fromX, spec.toX, { locked: true }));
   const { run } = simulateRun(course, pieces, buildSurfaces(pieces), {}, 90);
-  // A second of air is enough for one flip: ~0.8 s tucked plus the open spin.
+  // A second of air is enough for a 360: ~0.7 s wrapped up plus the open turn.
   return run.status === 'finished' && run.ouch === 0 && run.stats.longestAir >= 1 ? run : null;
 }
 

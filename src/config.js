@@ -27,16 +27,23 @@ export const PHYSICS = {
   // A pop off the tails: 4 m/s up is ~0.8 m of lift (v²/2g), enough to
   // clear a roller or add height at a lip.
   jumpImpulse: 4,
-  // Holding Flip tucks the body and spins it backwards: 7.5 rad/s is one
-  // backflip in ~0.85 s. Letting go opens the body, which multiplies its
-  // moment of inertia about five times, so the same angular momentum spins
-  // five times slower: the rider controls rotation the way divers do.
-  spinRateTucked: 7.5,
+  // Holding Spin wraps the arms in and turns the body about the vertical
+  // axis: 9 rad/s is a 360 in ~0.7 s. Letting go opens the arms, which
+  // multiplies the moment of inertia about five times, so the same angular
+  // momentum turns five times slower: the rider steers the rotation the
+  // way figure skaters do.
+  spinRateTucked: 9,
   openSpinFactor: 0.2,
-  // How far the body may be off the slope at touchdown after a stunt.
-  // Past the first is a sketchy landing (Ouch); past the second, a crash.
-  trickSketchyAngle: 0.3,
-  trickCrashAngle: 0.6,
+  // Touchdown is judged by the heading against the direction of travel.
+  // Facing forward, skis forgive a lot; riding backwards (switch), little;
+  // in between the skis are across the fall line and catch an edge.
+  forwardCleanAngle: 0.35,
+  forwardSafeAngle: 0.7,
+  switchCleanAngle: 0.17,
+  switchSafeAngle: 0.35,
+  // Riding backwards the legs cannot absorb a big landing: more airtime
+  // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
+  switchMaxAirSeconds: 1,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:
@@ -70,8 +77,8 @@ export const DEBRIS = {
 };
 
 export const SCORING = {
-  // Joy for each full flip landed cleanly.
-  flipJoy: 60,
+  // Joy for each half turn (180°) landed.
+  joyPerHalfTurn: 30,
   // Joy per second is speed above a walking pace, boosted in the air.
   joySpeedFloor: 2,
   airJoyMultiplier: 1.5,

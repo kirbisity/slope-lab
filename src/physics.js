@@ -333,33 +333,37 @@ const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
  * against the direction of travel. Forward is forgiving, backwards (switch)
  * is narrow, sideways is a crash. Whole half turns count as rotation.
  */
+/**
+ * How a touchdown at this heading (radians, 0 = facing down the hill) and
+ * airtime turns out: { stance: 'forward' | 'switch', clean } or
+ * { crash: 'sideways' | 'switch-big-air' }.
+ */
+export function landingOutcome(heading, airSeconds) {
+  const offForward = Math.abs(wrapAngle(heading));
+  const offBackward = Math.PI - offForward;
+  if (offForward <= PHYSICS.forwardSafeAngle) return { stance: 'forward', clean: offForward <= PHYSICS.forwardCleanAngle };
+  if (offBackward <= PHYSICS.switchSafeAngle) {
+    if (airSeconds > PHYSICS.switchMaxAirSeconds) return { crash: 'switch-big-air' };
+    return { stance: 'switch', clean: offBackward <= PHYSICS.switchCleanAngle };
+  }
+  return { crash: 'sideways' };
+}
+
 function judgeLanding(skier, airSeconds, events) {
   const spin = skier.spin;
   skier.spin = 0;
   skier.spinRate = 0;
   if (skier.crashed) return;
-  const heading = wrapAngle((skier.switchStance ? Math.PI : 0) + spin);
-  const offForward = Math.abs(heading);
-  const offBackward = Math.PI - offForward;
-  let clean;
-  if (offForward <= PHYSICS.forwardSafeAngle) {
-    skier.switchStance = false;
-    clean = offForward <= PHYSICS.forwardCleanAngle;
-  } else if (offBackward <= PHYSICS.switchSafeAngle) {
-    if (airSeconds > PHYSICS.switchMaxAirSeconds) {
-      skier.crashed = true;
-      events.push({ type: 'crash', impact: 0, kind: 'switch-big-air', x: skier.x, y: skier.y });
-      return;
-    }
-    const wasSwitch = skier.switchStance;
-    skier.switchStance = true;
-    clean = offBackward <= PHYSICS.switchCleanAngle;
-    if (!wasSwitch) events.push({ type: 'switch', x: skier.x, y: skier.y });
-  } else {
+  const outcome = landingOutcome((skier.switchStance ? Math.PI : 0) + spin, airSeconds);
+  if (outcome.crash) {
     skier.crashed = true;
-    events.push({ type: 'crash', impact: 0, kind: 'sideways', x: skier.x, y: skier.y });
+    events.push({ type: 'crash', impact: 0, kind: outcome.crash, x: skier.x, y: skier.y });
     return;
   }
+  const wasSwitch = skier.switchStance;
+  skier.switchStance = outcome.stance === 'switch';
+  if (skier.switchStance && !wasSwitch) events.push({ type: 'switch', x: skier.x, y: skier.y });
+  const clean = outcome.clean;
   if (!clean) events.push({ type: 'hard', impact: PHYSICS.softLandingSpeed + 2, kind: 'sketchy', x: skier.x, y: skier.y });
   const halfTurns = Math.round(Math.abs(spin) / Math.PI);
   if (halfTurns >= 1) events.push({ type: 'trick', degrees: halfTurns * 180, clean, x: skier.x, y: skier.y });
@@ -367,9 +371,24 @@ function judgeLanding(skier, airSeconds, events) {
 
 function spinInAir(skier, controls, dt) {
   if (skier.crashed) return;
-  if (controls.trick) skier.spinRate = PHYSICS.spinRateTucked;
-  else if (skier.spinRate > PHYSICS.spinRateTucked * PHYSICS.openSpinFactor) skier.spinRate = PHYSICS.spinRateTucked * PHYSICS.openSpinFactor;
-  skier.spin += skier.spinRate * dt;
+  if (controls.trick) {
+    skier.spinRate = PHYSICS.spinRateTucked;
+    skier.spin += skier.spinRate * dt;
+    return;
+  }
+  if (skier.spinRate === 0) return;
+  // Arms open, the rider spots the landing: the body turns at the open rate
+  // to the nearest heading straight down the hill (completing the turn past
+  // halfway, unwinding before it) and holds there. Only still holding Spin
+  // at touchdown lands anywhere else, including backwards.
+  const openRate = PHYSICS.spinRateTucked * PHYSICS.openSpinFactor;
+  const base = skier.switchStance ? Math.PI : 0;
+  const heading = base + skier.spin;
+  const target = Math.round(heading / (2 * Math.PI)) * 2 * Math.PI;
+  const remaining = target - heading;
+  const turn = Math.sign(remaining) * Math.min(Math.abs(remaining), openRate * dt);
+  skier.spin += turn;
+  skier.spinRate = Math.abs(remaining) <= openRate * dt ? 0 : openRate;
 }
 
 function alignInAir(skier, dt) {

@@ -28,23 +28,23 @@ export const PHYSICS = {
   // clear a roller or add height at a lip.
   jumpImpulse: 4,
   // Holding Spin wraps the arms in and turns the body about the vertical
-  // axis: 13 rad/s is a 360 in ~0.48 s. Letting go opens the arms, which
-  // multiplies the moment of inertia about seven times, so the same angular
-  // momentum turns seven times slower (~1.8 rad/s): the rider steers the
-  // rotation the way figure skaters do. The two move together: the open
-  // rate decides how much a quick tap on a small pop carries past 90°.
-  spinRateTucked: 13,
-  openSpinFactor: 0.14,
+  // axis: 17 rad/s is a 360 in ~0.37 s. Letting go opens the arms and the
+  // rider spots the landing: the turn carries on at the open rate (a fifth,
+  // as angular momentum demands) until the body faces straight down the
+  // hill or straight back, then holds there. A release crashes only if the
+  // air runs out before that heading comes round.
+  spinRateTucked: 17,
+  openSpinFactor: 0.2,
   // Touchdown is judged by the heading against the direction of travel.
-  // Facing forward, skis forgive a lot; riding backwards (switch), little;
+  // Facing forward, skis forgive a lot; riding backwards (switch), less;
   // in between the skis are across the fall line and catch an edge.
-  forwardCleanAngle: 0.35,
-  forwardSafeAngle: 0.7,
-  switchCleanAngle: 0.17,
-  switchSafeAngle: 0.35,
+  forwardCleanAngle: 0.45,
+  forwardSafeAngle: 0.9,
+  switchCleanAngle: 0.25,
+  switchSafeAngle: 0.5,
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
-  switchMaxAirSeconds: 1,
+  switchMaxAirSeconds: 1.2,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:

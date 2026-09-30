@@ -27,7 +27,7 @@ Works with mouse, keyboard, touch and pen, on phones and desktops.
 | Tuck (less drag) | ↓ or S | hold Tuck |
 | Brake (snowplough) | ← or A | hold Brake |
 | Pop off the snow | Space, ↑ or W | Pop |
-| Spin: pops, then turns while held; let go to slow the turn | → or D | hold Spin |
+| Spin: pops, then turns while held; let go and the skier lines up with the hill | → or D | hold Spin |
 | New Joyride slope | N | New slope |
 | Back to editing | R or Esc | ↺ |
 | Move, sketch, erase, start flag | V, D, E, S | tool bar |

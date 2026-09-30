@@ -1,0 +1,11 @@
+{
+  "name": "slope-lab",
+  "version": "2.0.0",
+  "description": "Slope Lab: design ski runs with y = f(x) and watch the physics ride them",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "python3 -m http.server 8932 --bind 127.0.0.1"
+  }
+}

@@ -15,8 +15,9 @@ export const PHYSICS = {
   // Waxed ski on groomed snow is 0.03–0.06; a snowplough digs the edges in.
   snowFriction: 0.045,
   brakeFriction: 0.3,
-  // A fallen skier slides on jacket and pants.
-  crashFriction: 0.6,
+  // A fallen skier slides on jacket and pants, which run on snow nearly as
+  // freely as skis do: a crash carries on down a slope.
+  crashFriction: 0.3,
   // Speed into the surface on touchdown. 4 m/s is a 0.8 m drop onto flat,
   // which legs absorb; 11 m/s is a 6 m drop onto flat, which they do not.
   // Landing on a slope parallel to the flight keeps this near zero, which is
@@ -38,10 +39,10 @@ export const PHYSICS = {
   // Touchdown is judged by the heading against the direction of travel.
   // Facing forward, skis forgive a lot; riding backwards (switch), less;
   // in between the skis are across the fall line and catch an edge.
-  forwardCleanAngle: 0.6,
-  forwardSafeAngle: 1.2,
-  switchCleanAngle: 0.35,
-  switchSafeAngle: 0.7,
+  forwardCleanAngle: 0.45,
+  forwardSafeAngle: 0.95,
+  switchCleanAngle: 0.25,
+  switchSafeAngle: 0.5,
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
@@ -57,6 +58,13 @@ export const PHYSICS = {
   // the flight, and they start lining up with this much time to spare.
   landingLookAheadSeconds: 0.05,
   landingSpareSeconds: 0.06,
+  // Riders never stop a spin exactly on the heading. Each jump the stop is
+  // off by spinSpotError × u^5, u uniform in ±1 and fixed per takeoff so a
+  // run replays the same: mostly a few degrees, now and then a lot. The
+  // share of spins that crash is 1 − (safe angle / spinSpotError)^(1/5):
+  // with 1.15 rad about 4% of forward landings and 15% of the tighter
+  // switch ones, about one tapped spin in ten across Joyride's jumps.
+  spinSpotError: 1.15,
   // Skis align with the flight path this fast while airborne (rad/s).
   airAlignRate: 2.2,
   // A vertex turning less than this is sampled curvature, not a kink:
@@ -121,15 +129,16 @@ export const RAGDOLL = {
   constraintPasses: 6,
   airDamping: 0.999,
   // Share of the slide the snow takes per contact substep. Grip is what
-  // turns a sliding body into a rolling one; four limbs touch more snow
-  // than two, so this rose from 0.25 when the ragdoll gained both sides.
-  contactFriction: 0.4,
+  // turns a slide into a roll: with little snow drag (below) a crashed body
+  // tumbles ~8 rad and 11 m down a 24° slope in 5 s. Less grip than this
+  // and it only slides, no longer rolling over on steep ground.
+  contactFriction: 0.35,
   // Contact margin keeps joints just clear of the surface they touch.
   contactLift: 0.005,
   // Joints that touched snow in the last few substeps are dragged by it
   // (velocity kept per substep), which ends slow creep and buzzing contacts.
   snowDragSubsteps: 4,
-  snowDrag: 0.93,
+  snowDrag: 0.985,
   // Nearly still for this long and the body sleeps: it stops simulating.
   sleepSpeed: 0.45,
   sleepSeconds: 0.5,
@@ -183,6 +192,14 @@ export const VIEW = {
   treeSpacing: 5.5,
   trailMaxPoints: 900,
   maxParticles: 260,
+  // Snow thrown up by a crash: soft puffs that billow, drift and fade.
+  // The first impact throws a big cloud; later hits and slides add puffs in
+  // proportion to how hard they are, a few times a second at most.
+  crashCloudPuffs: 70,
+  cloudPuffsPerImpactSpeed: 1.2,
+  cloudMinImpactSpeed: 2,
+  cloudCooldownSeconds: 0.09,
+  maxCloudPuffs: 220,
 };
 
 // The mountain range behind the course: a lit height-field mesh seen by its

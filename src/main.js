@@ -369,6 +369,8 @@ function handleRunEvent(event) {
       state.gear = throwGear(run.skier);
       state.slowMotionSeconds = CRASH_SLOW_MOTION_SECONDS;
       startRagdoll(run.skier);
+      snowCloud(event.x, event.y, VIEW.crashCloudPuffs, Math.max(4, speedOf(run.skier) * 0.35));
+      state.cloudCooldown = VIEW.cloudCooldownSeconds;
       playCrash(state.audio);
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * event.impact);
       break;
@@ -426,14 +428,51 @@ function updateParticles(dt) {
     }
   }
   for (const particle of state.particles) {
-    particle.vy -= PHYSICS.gravity * 0.6 * dt;
-    particle.vx *= 1 - 1.5 * dt;
+    if (particle.puff) {
+      // Powder hangs in the air: little gravity, strong drag, and it spreads.
+      particle.vy -= 0.8 * dt;
+      particle.vx *= 1 - 2.5 * dt;
+      particle.vy *= 1 - 2.5 * dt;
+      particle.vz *= 1 - 2.5 * dt;
+      particle.size += particle.growth * dt;
+    } else {
+      particle.vy -= PHYSICS.gravity * 0.6 * dt;
+      particle.vx *= 1 - 1.5 * dt;
+    }
     particle.x += particle.vx * dt;
     particle.y += particle.vy * dt;
     particle.z += particle.vz * dt;
     particle.life -= dt;
   }
   state.particles = state.particles.filter((particle) => particle.life > 0);
+}
+
+// A billowing cloud of snow at (x, y): big soft puffs thrown up and out,
+// which grow as they drift and fade over a second or two.
+function snowCloud(x, y, count, strength) {
+  let puffs = state.particles.filter((particle) => particle.puff).length;
+  for (let index = 0; index < count && puffs < VIEW.maxCloudPuffs; index += 1, puffs += 1) {
+    const angle = Math.PI * (0.1 + Math.random() * 0.8);
+    const speed = strength * (0.2 + Math.random() * 0.6);
+    const life = 1.1 + Math.random() * 1.1;
+    state.particles.push({
+      puff: true,
+      x: x + (Math.random() - 0.5) * 0.6, y: y + 0.1 + Math.random() * 0.3, z: (Math.random() - 0.5) * 2 * VIEW.laneHalfWidth,
+      vx: Math.cos(angle) * speed * (Math.random() < 0.5 ? -1 : 1), vy: Math.sin(angle) * speed * 0.7, vz: (Math.random() - 0.5) * 2.5,
+      life, maxLife: life, size: 0.25 + Math.random() * 0.45, growth: 0.5 + Math.random() * 0.6,
+    });
+  }
+}
+
+// Every hard hit or fast slide of the tumbling body throws up more snow.
+function cloudsFromRagdoll(dt) {
+  state.cloudCooldown = Math.max(0, (state.cloudCooldown || 0) - dt);
+  if (state.cloudCooldown > 0) return;
+  let hardest = null;
+  for (const impact of state.ragdoll.impacts) if (!hardest || impact.speed > hardest.speed) hardest = impact;
+  if (!hardest || hardest.speed < VIEW.cloudMinImpactSpeed) return;
+  snowCloud(hardest.x, hardest.y, Math.round(hardest.speed * VIEW.cloudPuffsPerImpactSpeed), hardest.speed * 0.4);
+  state.cloudCooldown = VIEW.cloudCooldownSeconds;
 }
 
 // ------------------------------------------------------------------ camera
@@ -526,7 +565,10 @@ function tick(dt) {
     if (!state.paused) {
       physicsFrame(worldDt);
       if (state.gear.length) state.gear = stepAllGear(state.gear, state.run.surfaces, worldDt, state.run.lowestY);
-      if (state.ragdoll) stepRagdoll(state.ragdoll, state.run.surfaces, worldDt);
+      if (state.ragdoll) {
+        stepRagdoll(state.ragdoll, state.run.surfaces, worldDt);
+        cloudsFromRagdoll(worldDt);
+      }
       else updateBody(worldDt);
     }
     updateLook(dt);

@@ -5,6 +5,10 @@ import { buildSurfaces, createEquationPiece } from '../src/track.js';
 import { PHYSICS } from '../src/config.js';
 
 const dt = PHYSICS.stepSeconds;
+// These tests pin the line-up with a rider who stops a spin exactly on the
+// heading; the last test measures how often a real, imperfect one crashes.
+const SPOT_ERROR = PHYSICS.spinSpotError;
+PHYSICS.spinSpotError = 0;
 const degrees = (value) => (value * Math.PI) / 180;
 const tucked = PHYSICS.spinRateTucked;
 
@@ -201,4 +205,26 @@ test('landing a flip is judged on being upright', async () => {
   assert.deepEqual(flipOutcome(2 * Math.PI + PHYSICS.flipCleanAngle / 2), { clean: true });
   assert.deepEqual(flipOutcome((PHYSICS.flipCleanAngle + PHYSICS.flipSafeAngle) / 2), { clean: false });
   assert.deepEqual(flipOutcome(Math.PI), { crash: 'flip' });
+});
+
+test('real riders stop a spin a little off: about one in ten crashes, flips never', () => {
+  PHYSICS.spinSpotError = SPOT_ERROR;
+  try {
+    let spinCrashes = 0;
+    let flipCrashes = 0;
+    let jumps = 0;
+    // Different in-run speeds make different takeoffs, so different stops.
+    for (let speed = 0; speed < 12; speed += 0.2) {
+      const spin = ride({ surfaces: bigJump, start: { x: -39, y: 38.7 }, speed, tapAt: 0.05 });
+      const flip = flipRide(bigJump, { x: -39, y: 38.7 }, speed, false, 0.05);
+      jumps += 1;
+      if (spin.skier.crashed) spinCrashes += 1;
+      if (flip.skier.crashed) flipCrashes += 1;
+    }
+    const spinRate = spinCrashes / jumps;
+    assert.ok(spinRate > 0.03 && spinRate < 0.25, `${spinCrashes} of ${jumps} spins crash`);
+    assert.equal(flipCrashes, 0, `${flipCrashes} flips crash`);
+  } finally {
+    PHYSICS.spinSpotError = 0;
+  }
 });

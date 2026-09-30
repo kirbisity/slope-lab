@@ -170,3 +170,22 @@ test('flipping leans the skier backwards and tucks the knees', async () => {
   assert.ok(flipping.shoulder[0] < plain.shoulder[0] - 0.15, 'shoulders thrown back');
   assert.ok(flipping.knee[1] > plain.knee[1], 'knees pulled up');
 });
+
+test('the ragdoll reports where and how hard it hits the snow, and goes quiet at rest', () => {
+  const flat = buildSurfaces([createEquationPiece('y = 0', -50, 150)]);
+  const ragdoll = standing(0, 0.6, 9, -4, 4);
+  let hardest = 0;
+  let reports = 0;
+  for (let frame = 0; frame < 60 * 2; frame += 1) {
+    stepRagdoll(ragdoll, flat, 1 / 60);
+    for (const impact of ragdoll.impacts) {
+      reports += 1;
+      hardest = Math.max(hardest, impact.speed);
+      assert.ok(Math.abs(impact.y) < 0.1, 'impacts are on the snow');
+    }
+  }
+  assert.ok(reports > 0 && hardest > 3, `hardest ${hardest.toFixed(1)} m/s over ${reports} contacts`);
+  for (let frame = 0; frame < 60 * 10 && !ragdoll.asleep; frame += 1) stepRagdoll(ragdoll, flat, 1 / 60);
+  stepRagdoll(ragdoll, flat, 1 / 60);
+  assert.deepEqual(ragdoll.impacts, []);
+});

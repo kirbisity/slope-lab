@@ -102,6 +102,7 @@ function launch(skier, segment, events, reason) {
   skier.flightLeft = Infinity;
   skier.spinning = false;
   skier.flipping = false;
+  skier.spotError = spotErrorFor(skier);
   events.push({ type: 'takeoff', reason, speed: Math.abs(skier.speed), x: skier.x, y: skier.y });
 }
 
@@ -370,7 +371,9 @@ export function flipOutcome(angle) {
 }
 
 function judgeLanding(skier, airSeconds, events) {
-  const spin = skier.spin;
+  // A rider who spun this jump stops a little off the heading they aimed for.
+  const spun = Math.abs(skier.spin) > Math.PI / 2;
+  const spin = skier.spin + (spun ? skier.spotError || 0 : 0);
   const flip = skier.flip;
   skier.spin = 0;
   skier.spinRate = 0;
@@ -399,6 +402,15 @@ function judgeLanding(skier, airSeconds, events) {
   const halfTurns = Math.round(Math.abs(spin) / Math.PI);
   const flips = Math.round(Math.abs(flip) / (2 * Math.PI));
   if (halfTurns >= 1 || flips >= 1) events.push({ type: 'trick', degrees: halfTurns * 180, flips, clean, x: skier.x, y: skier.y });
+}
+
+// How far off this rider stops a spin on this jump (radians): a fixed
+// pseudo-random draw from where and how fast they took off, so the same
+// jump always lands the same way. u^5 keeps most stops close.
+function spotErrorFor(skier) {
+  const value = Math.sin(skier.x * 12.9898 + skier.y * 78.233 + Math.hypot(skier.vx, skier.vy) * 37.719) * 43758.5453;
+  const unit = (value - Math.floor(value)) * 2 - 1;
+  return PHYSICS.spinSpotError * unit ** 5;
 }
 
 /**

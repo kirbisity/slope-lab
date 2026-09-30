@@ -39,8 +39,8 @@ const state = {
   paused: false,
   run: null,
   lastTrace: null,
-  keys: { tuck: false, brake: false, trick: false },
-  touch: { tuck: false, brake: false, trick: false },
+  keys: { tuck: false, brake: false },
+  touch: { tuck: false, brake: false },
   gear: [],
   slowMotionSeconds: 0,
   body: createBodyDynamics(),
@@ -48,6 +48,10 @@ const state = {
   pendingImpact: 0,
   lastSpeed: 0,
   jumpBufferSeconds: 0,
+  // Spin and Flip are taps: a press is remembered this long so a quick tap
+  // between two frames still counts, then momentum does the rest.
+  spinBufferSeconds: 0,
+  flipBufferSeconds: 0,
   look: { tuck: 0, pitch: 0, tumble: 0, brake: false },
   particles: [],
   camera: createCamera(),
@@ -237,6 +241,8 @@ function startRide() {
   state.gForce = 1;
   state.resultTimer = 0;
   state.jumpBufferSeconds = 0;
+  state.spinBufferSeconds = 0;
+  state.flipBufferSeconds = 0;
   state.rideZoom = clampZoom(Math.max(14, Math.min(40, Math.min(state.camera.width, state.camera.height) / 26)));
   state.followPausedUntil = 0;
   document.body.classList.add('riding');
@@ -285,7 +291,8 @@ function currentControls() {
   return {
     tuck: state.keys.tuck || state.touch.tuck,
     brake: state.keys.brake || state.touch.brake,
-    trick: state.keys.trick || state.touch.trick,
+    trick: state.spinBufferSeconds > 0,
+    flip: state.flipBufferSeconds > 0,
     jump,
   };
 }
@@ -301,14 +308,34 @@ function physicsFrame(frameSeconds) {
     recordSample(state.recorder, run.time, run.skier, PHYSICS.stepSeconds);
     if (controls.jump && wasGrounded) state.jumpBufferSeconds = 0;
     state.jumpBufferSeconds = Math.max(0, state.jumpBufferSeconds - PHYSICS.stepSeconds);
+    state.spinBufferSeconds = Math.max(0, state.spinBufferSeconds - PHYSICS.stepSeconds);
+    state.flipBufferSeconds = Math.max(0, state.flipBufferSeconds - PHYSICS.stepSeconds);
     for (const event of events) handleRunEvent(event);
   }
 }
 
+// "Switch 540", "Backflip", "Double backflip 360".
+function trickName(event, switchStance) {
+  const parts = [];
+  if (switchStance) parts.push('Switch');
+  if (event.flips) parts.push(`${['', '', 'Double ', 'Triple ', 'Quad '][Math.min(event.flips, 4)]}${event.flips > 1 ? 'backflip' : 'Backflip'}`);
+  if (event.degrees) parts.push(String(event.degrees));
+  return parts.join(' ');
+}
+
 const CRASH_MESSAGES = {
-  sideways: 'Landed sideways! Let go of Spin in time to line up',
+  sideways: 'Landed sideways!',
+  flip: 'Landed on your back!',
   'switch-big-air': 'Too much air to land backwards',
 };
+
+// Spin and Flip are taps: on the snow they pop first, so one press chains
+// both; in the air the body's momentum keeps the rotation going to the landing.
+function pressTrick(kind) {
+  state.jumpBufferSeconds = 0.15;
+  if (kind === 'spin') state.spinBufferSeconds = 0.15;
+  else state.flipBufferSeconds = 0.15;
+}
 
 // The body goes limp where it stands: the ragdoll takes the pose on screen,
 // the skier's speed, and a forward tumble that grows with speed.
@@ -346,8 +373,8 @@ function handleRunEvent(event) {
       state.shake = Math.max(state.shake, SHAKE_PER_IMPACT * event.impact);
       break;
     case 'trick':
-      toast(`${run.skier.switchStance ? 'Switch ' : ''}${event.degrees}! +${(event.degrees / 180) * SCORING.joyPerHalfTurn} joy`, event.clean ? 'good' : 'warn');
-      playChime(state.audio, [990, 1320, 1760].slice(0, Math.min(3, event.degrees / 180)));
+      toast(`${trickName(event, run.skier.switchStance)}! +${(event.degrees / 180) * SCORING.joyPerHalfTurn + event.flips * SCORING.joyPerFlip} joy`, event.clean ? 'good' : 'warn');
+      playChime(state.audio, [990, 1320, 1760].slice(0, Math.min(3, event.degrees / 180 + event.flips)));
       break;
     case 'switch':
       toast('Riding backwards: no brakes, and no big landings', 'warn');
@@ -546,10 +573,13 @@ function updateLook(dt) {
   const run = state.run;
   const controls = currentControls();
   const look = state.look;
-  look.tuck += ((controls.tuck || (controls.trick && run.skier.mode === 'air') ? 1 : 0) - look.tuck) * Math.min(1, dt * 10);
+  const spinning = run.skier.mode === 'air' && (run.skier.spinning || run.skier.spinRate > 0);
+  look.tuck += ((controls.tuck || spinning ? 1 : 0) - look.tuck) * Math.min(1, dt * 10);
   // Heading about the vertical axis: half a turn when riding backwards.
   look.yaw = (run.skier.switchStance ? Math.PI : 0) + run.skier.spin;
   look.lostGear = run.skier.crashed;
+  const flipping = run.skier.mode === 'air' && (run.skier.flipping || run.skier.flipRate > 0);
+  look.flipping = (look.flipping || 0) + ((flipping ? 1 : 0) - (look.flipping || 0)) * Math.min(1, dt * 12);
   look.body = state.body;
   look.brake = controls.brake && run.skier.mode === 'ground' && !run.skier.switchStance;
   const difference = Math.atan2(Math.sin(run.skier.pitch - look.pitch), Math.cos(run.skier.pitch - look.pitch));
@@ -1151,12 +1181,8 @@ window.addEventListener('keydown', (event) => {
     if (key === 'arrowdown' || key === 's') { state.keys.tuck = true; event.preventDefault(); }
     if (key === 'arrowleft' || key === 'a') { state.keys.brake = true; event.preventDefault(); }
     if ((key === ' ' || key === 'arrowup' || key === 'w') && !event.repeat) { state.jumpBufferSeconds = 0.15; event.preventDefault(); }
-    if (key === 'arrowright' || key === 'd') {
-      // Spin pressed on the snow pops first, so one press chains both.
-      if (!event.repeat) state.jumpBufferSeconds = 0.15;
-      state.keys.trick = true;
-      event.preventDefault();
-    }
+    if ((key === 'arrowright' || key === 'd') && !event.repeat) { pressTrick('spin'); event.preventDefault(); }
+    if (key === 'f' && !event.repeat) { pressTrick('flip'); event.preventDefault(); }
     if (key === 'n' && isJoyride()) newJoyride();
     if (key === 'p') togglePause();
     if (key === 'r') backToEdit();
@@ -1179,7 +1205,6 @@ window.addEventListener('keyup', (event) => {
   const key = event.key.toLowerCase();
   if (key === 'arrowdown' || key === 's') state.keys.tuck = false;
   if (key === 'arrowleft' || key === 'a') state.keys.brake = false;
-  if (key === 'arrowright' || key === 'd') state.keys.trick = false;
 });
 
 window.addEventListener('blur', () => {
@@ -1187,8 +1212,6 @@ window.addEventListener('blur', () => {
   state.keys.brake = false;
   state.touch.tuck = false;
   state.touch.brake = false;
-  state.keys.trick = false;
-  state.touch.trick = false;
 });
 
 // --------------------------------------------------------------- buttons
@@ -1278,12 +1301,12 @@ for (const button of document.querySelectorAll('.hold')) {
     capture(button, event.pointerId);
     button.classList.add('active');
     if (control === 'jump') state.jumpBufferSeconds = 0.15;
+    else if (control === 'spin' || control === 'flip') pressTrick(control);
     else state.touch[control] = true;
-    if (control === 'trick') state.jumpBufferSeconds = 0.15;
   };
   const releaseHold = () => {
     button.classList.remove('active');
-    if (control !== 'jump') state.touch[control] = false;
+    if (control === 'tuck' || control === 'brake') state.touch[control] = false;
   };
   button.addEventListener('pointerdown', press);
   button.addEventListener('pointerup', releaseHold);
@@ -1303,7 +1326,7 @@ resizeCanvas();
 loadCourse(loadPreference('course', JOYRIDE_ID));
 if (!loadPreference('welcomed', false)) {
   savePreference('welcomed', true);
-  setTimeout(() => toast('Press Ride. Spin pops and turns; let go to land facing forward.'), 400);
+  setTimeout(() => toast('Press Ride, then tap Spin or Flip at a jump.'), 400);
 }
 requestAnimationFrame(frame);
 window.slopeLab = { state, startRide, backToEdit, loadCourse, fitView, advance };

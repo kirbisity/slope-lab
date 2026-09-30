@@ -166,8 +166,11 @@ body.riding .readout { left: calc(12px + var(--safe-left)); }
 }
 .hold kbd { font: 500 10px/1 var(--font-mono); opacity: 0.7; }
 .hold.jump { background: rgba(226, 85, 45, 0.85); }
-.hold.flip { background: rgba(47, 125, 209, 0.82); }
-.hold.flip.active { background: var(--ice); }
+.hold.spin { background: rgba(47, 125, 209, 0.82); }
+.hold.spin.active { background: var(--ice); }
+.hold.backflip { background: rgba(32, 163, 107, 0.82); }
+.hold.backflip.active { background: var(--pine); }
+.hold-pair.tricks { flex-wrap: nowrap; }
 .hold.active { background: var(--ink); transform: scale(0.95); }
 .hold.jump.active { background: var(--accent); }
 body.editing .ride-controls { display: none; }
@@ -320,8 +323,10 @@ body.riding .tools, body.riding .tracks-panel { display: none; }
   .gauges dt { min-width: 0; font-size: 10px; }
   .gauges dd { font-size: 12.5px; min-width: 50px; }
   .ride-controls { bottom: calc(80px + var(--safe-bottom)); }
-  .hold { width: 74px; height: 74px; font-size: 15px; }
+  .hold { width: 66px; height: 66px; font-size: 14px; }
   .hold kbd { display: none; }
+  /* Four trick buttons as a 2×2 grid under the right thumb. */
+  .hold-pair.tricks { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
   /* The sheet sits on top of the tool bar so the tools stay reachable. */
   .tracks-panel {
     left: calc(6px + var(--safe-left)); right: calc(6px + var(--safe-right)); top: auto; bottom: calc(62px + var(--safe-bottom)); width: auto; max-height: min(58%, 460px);

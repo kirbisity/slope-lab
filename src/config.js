@@ -45,6 +45,14 @@ export const PHYSICS = {
   // Riding backwards the legs cannot absorb a big landing: more airtime
   // than this, landed switch, is a crash. A pop (~0.8 s) is still fine.
   switchMaxAirSeconds: 1.2,
+  // Flip tucks the knees and rolls the body backwards about the belly:
+  // 9 rad/s is a backflip in ~0.7 s, slower than a spin because the body is
+  // long in that direction. It lines up upright at the open rate, like a spin.
+  flipRateTucked: 9,
+  // Off upright at touchdown: past the first a sketchy landing, past the
+  // second the skier lands on their back.
+  flipCleanAngle: 0.35,
+  flipSafeAngle: 0.8,
   // The rider sees the landing coming: this often (s) they look ahead along
   // the flight, and they start lining up with this much time to spare.
   landingLookAheadSeconds: 0.05,
@@ -128,6 +136,8 @@ export const RAGDOLL = {
 };
 
 export const SCORING = {
+  // Joy for each backflip landed.
+  joyPerFlip: 60,
   // Joy for each half turn (180°) landed.
   joyPerHalfTurn: 30,
   // Joy per second is speed above a walking pace, boosted in the air.

@@ -161,3 +161,12 @@ test('left and right limbs fold independently in a tumble', () => {
   }
   assert.ok(widest > 0.3, `the feet drift ${widest.toFixed(2)} m apart at most`);
 });
+
+test('flipping leans the skier backwards and tucks the knees', async () => {
+  const { skierPose } = await import('../src/renderer.js');
+  const skier = { x: 0, y: 0, mode: 'air', facing: 1, pitch: 0 };
+  const plain = skierPose(skier, { tuck: 0, brake: false, pitch: 0, body: createBodyDynamics(), flipping: 0 });
+  const flipping = skierPose(skier, { tuck: 0, brake: false, pitch: 0, body: createBodyDynamics(), flipping: 1 });
+  assert.ok(flipping.shoulder[0] < plain.shoulder[0] - 0.15, 'shoulders thrown back');
+  assert.ok(flipping.knee[1] > plain.knee[1], 'knees pulled up');
+});

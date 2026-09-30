@@ -70,3 +70,13 @@ test('the same model is built from a tumbling ragdoll', () => {
   assert.ok(faces.length > 60);
   for (const face of faces) for (const point of face.points) assert.ok(Number.isFinite(point.x + point.y + point.z));
 });
+
+test('a backflip turns the body about the belly: half way round, the head is below the feet', () => {
+  const upright = placeJoints(posedJoints(pose), { x: 0, y: 0, pitch: 0, heading: 0, flip: 0 });
+  const inverted = placeJoints(posedJoints(pose), { x: 0, y: 0, pitch: 0, heading: 0, flip: Math.PI });
+  assert.ok(inverted.head.y < inverted.footL.y, 'upside down');
+  const belly = (joints) => (joints.hipL.y + joints.shoulderL.y) / 2;
+  assert.ok(Math.abs(belly(inverted) - belly(upright)) < 0.35, 'turns about the middle of the body, not the feet');
+  const quarter = placeJoints(posedJoints(pose), { x: 0, y: 0, pitch: 0, heading: 0, flip: Math.PI / 2 });
+  assert.ok(quarter.head.x < quarter.footL.x, 'a backflip goes over backwards: head leads backwards first');
+});

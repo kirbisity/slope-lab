@@ -90,9 +90,10 @@
   <div class="ride-controls" id="ride-controls" hidden>
     <div class="hold-pair">
       <button class="hold" id="brake-button" type="button" data-control="brake"><strong>Brake</strong><kbd>←</kbd></button>
-      <button class="hold flip" id="flip-button" type="button" data-control="trick"><strong>Spin</strong><kbd>→</kbd></button>
     </div>
-    <div class="hold-pair">
+    <div class="hold-pair tricks">
+      <button class="hold spin" id="spin-button" type="button" data-control="spin"><strong>Spin</strong><kbd>→</kbd></button>
+      <button class="hold backflip" id="flip-button" type="button" data-control="flip"><strong>Flip</strong><kbd>F</kbd></button>
       <button class="hold" id="tuck-button" type="button" data-control="tuck"><strong>Tuck</strong><kbd>↓</kbd></button>
       <button class="hold jump" id="jump-button" type="button" data-control="jump"><strong>Pop</strong><kbd>Space</kbd></button>
     </div>
@@ -161,7 +162,7 @@
             <li><kbd>↓</kbd> / <kbd>S</kbd> hold to <b>tuck</b>: less drag, more speed</li>
             <li><kbd>←</kbd> / <kbd>A</kbd> hold to <b>brake</b>: a snowplough, more friction</li>
             <li><kbd>Space</kbd> / <kbd>↑</kbd> to <b>pop</b> off the snow</li>
-            <li><kbd>→</kbd> / <kbd>D</kbd> <b>spin</b>: pops off the snow and turns while held. Hold longer for more turns; the skier sees the landing coming and lines up in time, facing down the hill (or straight back on a small hop)</li>
+            <li><kbd>→</kbd> / <kbd>D</kbd> tap to <b>spin</b>, <kbd>F</kbd> to <b>backflip</b>, both for a combo: momentum turns you, and you line up to land</li>
             <li><kbd>R</kbd> back to editing, <kbd>P</kbd> pause, <kbd>M</kbd> sound</li>
           </ul>
           <p>On a touchscreen the same three buttons appear at the bottom while you ride. Finish a slope and a ghost of your best run races you next time.</p>
@@ -173,7 +174,7 @@
         </article>
         <article class="help-page" hidden>
           <h3>4 · Scoring</h3>
-          <p><b>Joy</b> grows with speed above walking pace, faster in the air, and +30 for every half turn landed. <b>Ouch</b> grows with every hard landing or sharp kink. <b>Score</b> = 50 × Joy ÷ (Ouch + 1), so smooth lines beat rough ones.</p>
+          <p><b>Joy</b> grows with speed above walking pace, faster in the air, +30 for every half turn and +60 for every backflip landed. <b>Ouch</b> grows with every hard landing or sharp kink. <b>Score</b> = 50 × Joy ÷ (Ouch + 1), so smooth lines beat rough ones.</p>
           <p>Start with <b>Joyride</b>, a new random slope each time with no maths needed. Each slope has three stars. Some need a clean run, others need you to go faster or fly longer. Challenges limit how many metres of track (<b>ink</b>) you can add.</p>
         </article>
       </div>

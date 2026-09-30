@@ -59,11 +59,15 @@ test('extreme loads stay bounded', () => {
   }
 });
 
-// A standing skeleton at x, on ground height y, moving at (vx, vy).
+// A standing skeleton at x, on ground height y, moving at (vx, vy), with
+// left and right limbs a little apart, as a skier's are.
 function standing(x, y, vx = 0, vy = 0, spin = 0) {
   const joints = {
-    foot: { x, y }, knee: { x: x + 0.2, y: y + 0.5 }, hip: { x, y: y + 0.95 },
-    shoulder: { x: x + 0.14, y: y + 1.45 }, head: { x: x + 0.2, y: y + 1.66 }, hand: { x: x + 0.5, y: y + 1 },
+    footL: { x: x - 0.04, y }, footR: { x: x + 0.04, y },
+    kneeL: { x: x + 0.18, y: y + 0.5 }, kneeR: { x: x + 0.22, y: y + 0.5 },
+    hip: { x, y: y + 0.95 }, shoulder: { x: x + 0.14, y: y + 1.45 }, head: { x: x + 0.2, y: y + 1.66 },
+    elbowL: { x: x + 0.3, y: y + 1.2 }, elbowR: { x: x + 0.34, y: y + 1.18 },
+    handL: { x: x + 0.48, y: y + 1.02 }, handR: { x: x + 0.52, y: y + 0.98 },
   };
   return createRagdoll(joints, { vx, vy, spin });
 }
@@ -121,7 +125,7 @@ test('the drawn pose bends with the body: loaded knees lower the hips, a lean mo
   const facingRight = skierJointsInWorld(skier, look(createBodyDynamics()));
   const facingLeft = skierJointsInWorld({ ...skier, facing: -1 }, look(createBodyDynamics()));
   assert.ok(Math.abs((facingRight.head.x - 10) + (facingLeft.head.x - 10)) < 1e-9, 'mirrored when facing the other way');
-  assert.ok(facingRight.head.y > facingRight.hip.y && facingRight.hip.y > facingRight.foot.y);
+  assert.ok(facingRight.head.y > facingRight.hip.y && facingRight.hip.y > facingRight.footL.y);
 });
 
 test('gravity is not felt: sliding freely feels like nothing, braking feels like slowing', async () => {
@@ -144,4 +148,16 @@ test('gravity is not felt: sliding freely feels like nothing, braking feels like
   assert.ok(free < 0 && free > -2, `free slide feels ${free}`);
   // Braking feels strongly backwards: that is what pitches the torso forward.
   assert.ok(braking < -2, `braking feels ${braking}`);
+});
+
+test('left and right limbs fold independently in a tumble', () => {
+  const slope = buildSurfaces([createEquationPiece('y = -0.9x', -20, 300)]);
+  const ragdoll = standing(0, 0.05, 10, -9, 8);
+  let widest = 0;
+  for (let frame = 0; frame < 60 * 3; frame += 1) {
+    stepRagdoll(ragdoll, slope, 1 / 60);
+    const { footL, footR } = ragdoll.points;
+    widest = Math.max(widest, Math.hypot(footL.x - footR.x, footL.y - footR.y));
+  }
+  assert.ok(widest > 0.3, `the feet drift ${widest.toFixed(2)} m apart at most`);
 });

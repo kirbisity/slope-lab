@@ -68,30 +68,38 @@ export function feltAcceleration(skier, previousSpeed, dt) {
 
 // ------------------------------------------------------------- the ragdoll
 
+// Both legs and both arms, so each can fold its own way.
 export const SKELETON_BONES = [
-  ['foot', 'knee'], ['knee', 'hip'], ['hip', 'shoulder'],
-  ['shoulder', 'head'], ['shoulder', 'elbow'], ['elbow', 'hand'],
+  ['footL', 'kneeL'], ['kneeL', 'hip'], ['footR', 'kneeR'], ['kneeR', 'hip'],
+  ['hip', 'shoulder'], ['shoulder', 'head'],
+  ['shoulder', 'elbowL'], ['elbowL', 'handL'], ['shoulder', 'elbowR'], ['elbowR', 'handR'],
 ];
 
 // Joints may fold but not pass through the body: these pairs keep at least
 // this share of their starting distance.
-const MINIMUM_SPANS = [['knee', 'shoulder', 0.45], ['hip', 'head', 0.7], ['foot', 'hip', 0.35], ['hand', 'hip', 0.2]];
+const MINIMUM_SPANS = [
+  ['kneeL', 'shoulder', 0.45], ['kneeR', 'shoulder', 0.45], ['hip', 'head', 0.7],
+  ['footL', 'hip', 0.35], ['footR', 'hip', 0.35], ['handL', 'hip', 0.2], ['handR', 'hip', 0.2],
+];
+
+// Limbs are thrown a little apart in a crash, one up and one down, so the
+// two sides of the body tumble differently.
+const LIMB_SPREAD = 0.8;
 
 /**
- * Build a ragdoll from world joint positions ({foot, knee, hip, shoulder,
- * head, hand, optional elbow}) moving at (vx, vy) and turning at `spin`
- * rad/s about the hips.
+ * Build a ragdoll from world joint positions (footL/R, kneeL/R, hip,
+ * shoulder, head, elbowL/R, handL/R) moving at (vx, vy) and turning at
+ * `spin` rad/s about the hips.
  */
 export function createRagdoll(joints, motion, dt = 1 / 60) {
-  const all = { ...joints };
-  if (!all.elbow) all.elbow = { x: (all.shoulder.x + all.hand.x) / 2, y: (all.shoulder.y + all.hand.y) / 2 - 0.05 };
-  const hip = all.hip;
+  const hip = joints.hip;
   const points = {};
-  for (const [name, joint] of Object.entries(all)) {
+  for (const [name, joint] of Object.entries(joints)) {
     const rx = joint.x - hip.x;
     const ry = joint.y - hip.y;
+    const side = name.endsWith('L') ? 1 : name.endsWith('R') ? -1 : 0;
     const vx = motion.vx - motion.spin * ry;
-    const vy = motion.vy + motion.spin * rx;
+    const vy = motion.vy + motion.spin * rx + side * LIMB_SPREAD;
     points[name] = { x: joint.x, y: joint.y, previousX: joint.x - vx * dt, previousY: joint.y - vy * dt, touching: 0 };
   }
   const distance = (a, b) => Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);

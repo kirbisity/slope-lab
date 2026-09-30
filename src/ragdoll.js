@@ -154,7 +154,8 @@ function collide(point, start, surfaces) {
   const vy = point.y - point.previousY;
   const along = vx * tx + vy * ty;
   const into = Math.max(0, -(vx * nx + vy * ny));
-  const slide = along * (1 - RAGDOLL.contactFriction);
+  // Coulomb: the friction impulse is at most μ times the normal one.
+  const slide = Math.sign(along) * Math.max(0, Math.abs(along) - RAGDOLL.contactFriction * into);
   const lift = Math.max(0, vx * nx + vy * ny);
   point.x = contactX;
   point.y = contactY;
@@ -177,7 +178,7 @@ export function stepRagdoll(ragdoll, surfaces, dt) {
       starts[name] = { x: point.x, y: point.y };
       // Velocity is stored as the last step's displacement; rescale it when
       // the step length changes (slow motion, first step).
-      const drag = point.touching > 0 ? RAGDOLL.snowDrag : RAGDOLL.airDamping;
+      const drag = Math.exp(-(point.touching > 0 ? RAGDOLL.snowDragPerSecond : RAGDOLL.airDragPerSecond) * h);
       const vx = (point.x - point.previousX) * scale * drag;
       const vy = (point.y - point.previousY) * scale * drag;
       point.previousX = point.x;

@@ -77,7 +77,10 @@ test('one tap of Spin keeps the skier turning until the landing', () => {
   assert.ok(tappedTrick, tapped.events.map((event) => event.kind || event.type).join(','));
   assert.equal(tapped.skier.crashed, false);
   assert.equal(tappedTrick.degrees, held.events.find((event) => event.type === 'trick').degrees, 'a tap spins as far as holding does');
-  assert.ok(tappedTrick.degrees >= 720, 'as many turns as the air allows');
+  // Big air lands forward, so the spin is the most whole turns that fit.
+  const turnsThatFit = Math.floor(((bigAir - 0.05 - PHYSICS.landingSpareSeconds) * tucked) / (2 * Math.PI));
+  assert.ok(turnsThatFit >= 1, `the big jump fits a 360 (${bigAir.toFixed(2)} s of air)`);
+  assert.equal(tappedTrick.degrees, 360 * turnsThatFit, 'as many turns as the air allows');
 });
 
 test('holding Spin right through a jump still lands: the rider lines up in time', () => {
